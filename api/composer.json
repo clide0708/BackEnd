@@ -1,0 +1,17 @@
+{
+    "name": "prototipo-tcc/backend",
+    "description": "API Backend para sistema de gerenciamento do sistema da plataforma CLIDE Fit - TCC",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Enzo Krebs",
+            "email": "enzokrebs8@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "firebase/php-jwt": "^6.10",
+        "vlucas/phpdotenv": "^5.6"
+    }
+}
