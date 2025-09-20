@@ -7,6 +7,10 @@
         {
             "name": "Enzo Krebs",
             "email": "enzokrebs8@gmail.com"
+        },
+        {
+            "name": "Davi Ramos",
+            "email": "daviramos1703@gmail.com"
         }
     ],
     "minimum-stability": "stable",
