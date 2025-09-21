@@ -3,7 +3,7 @@
         'name' => 'prototipo-tcc/backend',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'a1dc1549c39844565fe9703f3247e249f2860c4b',
+        'reference' => '5745c4e37fa9e0211b9b4298373883103718329c',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -40,7 +40,7 @@
         'prototipo-tcc/backend' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'a1dc1549c39844565fe9703f3247e249f2860c4b',
+            'reference' => '5745c4e37fa9e0211b9b4298373883103718329c',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
