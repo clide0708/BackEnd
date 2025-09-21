@@ -64,22 +64,24 @@ function decodificarToken($token) {
 // Extrair token do header
 function extrairTokenHeader() {
     $headers = null;
-
-    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        $headers = trim($_SERVER['HTTP_AUTHORIZATION']);
-    } elseif (isset($_SERVER['Authorization'])) {
-        $headers = trim($_SERVER['Authorization']);
+    if (isset($_SERVER['Authorization'])) {
+        $headers = trim($_SERVER["Authorization"]);
+    } else if (isset($_SERVER['HTTP_AUTHORIZATION'])) { // Nginx ou fast CGI
+        $headers = trim($_SERVER["HTTP_AUTHORIZATION"]);
     } elseif (function_exists('apache_request_headers')) {
         $requestHeaders = apache_request_headers();
-        if (isset($requestHeaders['Authorization'])) {
-            $headers = trim($requestHeaders['Authorization']);
+        // Procura por Authorization case-insensitive
+        foreach ($requestHeaders as $key => $value) {
+            if (strcasecmp($key, 'Authorization') == 0) {
+                $headers = trim($value);
+                break;
+            }
         }
     }
-
-    if ($headers && preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
+    // Extrai o token do formato "Bearer token"
+    if (!empty($headers) && preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
         return $matches[1];
     }
-
     return null;
 }
 
