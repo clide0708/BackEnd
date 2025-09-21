@@ -258,10 +258,25 @@
         $clean_path = implode('/', $path_segments);
         $matched_route = null;
         $params = [];
-
+        
+        require_once __DIR__ . '/../Config/auth.middleware.php';
+        
         // Remove query string do path para matching de rotas
         $clean_path = parse_url($clean_path, PHP_URL_PATH);
         $clean_path = trim($clean_path, '/');
+
+        // Rotas públicas que não precisam de autenticação
+        $rotasPublicas = [
+            'auth/login',
+            'cadastro/aluno',
+            'cadastro/personal',
+            'cadastro/verificar-email',
+            'cadastro/verificar-cpf',
+        ];
+        // Se a rota não for pública, exige autenticação
+        if (!in_array($clean_path, $rotasPublicas)) {
+            autenticar();
+        }
 
         // Procura por correspondência exata primeiro
         if (array_key_exists($clean_path, $routes)) {
