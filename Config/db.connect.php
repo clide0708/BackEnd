@@ -1,11 +1,11 @@
 <?php 
-class DB{
-    public static function connectDB() { 
-        // Carregar .env se existir
-        if (file_exists(__DIR__ . '/.env')) {
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-            $dotenv->load();
-        }
+class DB {
+    private static function tentarConexao($envFile) {
+        if (!file_exists($envFile)) return null;
+
+        // recarrega o .env do arquivo correto
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__, basename($envFile));
+        $dotenv->load();
 
         $host = $_ENV['DB_HOST'] ?? 'localhost';
         $db   = $_ENV['DB_NAME'] ?? 'bd_tcc'; 
@@ -22,8 +22,29 @@ class DB{
         try {
             return new PDO("mysql:host={$host};dbname={$db};charset={$charset}", $user, $pass, $options);
         } catch (\PDOException $e) {
-            throw new \PDOException($e->getMessage(), (int)$e->getCode());
+            error_log("Falha ao conectar com $envFile: " . $e->getMessage());
+            return null;
         }
     }
+
+    public static function connectDB() { 
+        // tenta production primeiro
+        $con = self::tentarConexao(__DIR__ . '/.env.production');
+        if ($con) return $con;
+
+        // limpa variáveis antigas do production antes de tentar development
+        foreach ($_ENV as $key => $value) {
+            if (str_starts_with($key, 'DB_')) unset($_ENV[$key]);
+        }
+
+        // fallback para development
+        $con = self::tentarConexao(__DIR__ . '/.env.development');
+        if ($con) return $con;
+
+        // nenhum funcionou
+        throw new \PDOException("❌ Não foi possível conectar ao banco nem no production nem no development");
+    }
 }
-?>
+function connectDB() {
+    return DB::connectDB();
+}
