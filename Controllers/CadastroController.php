@@ -63,25 +63,26 @@
 
                 // Hash da senha
                 $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
-                $dataCadastro = date('Y-m-d H:i:s');
+                // Removido: $dataCadastro = date('Y-m-d H:i:s');  // Agora usamos NOW() no SQL
 
                 // Formatar CPF e telefone
                 $cpfFormatado = $this->formatarCPF($data['cpf']);
                 $telefoneFormatado = $this->formatarTelefone($data['numTel']);
 
+                // MUDANÇA: Use NOW() diretamente no SQL para data_cadastro (data atual do BD)
                 $stmt = $this->db->prepare("
                     INSERT INTO alunos (nome, cpf, rg, email, senha, numTel, data_cadastro, statusPlano) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'A verificar')
+                    VALUES (?, ?, ?, ?, ?, ?, NOW(), 'A verificar')
                 ");
 
+                // MUDANÇA: Execute com 6 parâmetros (sem data_cadastro)
                 $success = $stmt->execute([
                     trim($data['nome']),
                     $cpfFormatado,
                     trim($data['rg']),
                     trim($data['email']),
                     $senhaHash,
-                    $telefoneFormatado,
-                    $dataCadastro
+                    $telefoneFormatado
                 ]);
 
                 if ($success) {
@@ -193,7 +194,7 @@
 
                 // Hash da senha
                 $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
-                $dataCadastro = date('Y-m-d H:i:s');
+                // Removido: $dataCadastro = date('Y-m-d H:i:s');  // Agora usamos NOW() no SQL
 
                 // Formatar dados
                 $cpfFormatado = $this->formatarCPF($data['cpf']);
@@ -204,12 +205,14 @@
                 $crefCategoria = $this->formatarCREFCategoria($data['cref_categoria']);
                 $crefRegional = $this->formatarCREFRegional($data['cref_regional']);
 
+                // MUDANÇA: Use NOW() diretamente no SQL para data_cadastro (data atual do BD)
                 $stmt = $this->db->prepare("
                     INSERT INTO personal 
                     (nome, cpf, rg, cref_numero, cref_categoria, cref_regional, email, senha, numTel, data_cadastro, statusPlano) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'A verificar')
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'A verificar')
                 ");
 
+                // MUDANÇA: Execute com 9 parâmetros (sem data_cadastro)
                 $success = $stmt->execute([
                     trim($data['nome']),
                     $cpfFormatado,
@@ -219,8 +222,7 @@
                     $crefRegional,
                     trim($data['email']),
                     $senhaHash,
-                    $telefoneFormatado,
-                    $dataCadastro
+                    $telefoneFormatado
                 ]);
 
                 if ($success) {
@@ -280,7 +282,7 @@
             return strlen($cpf) === 11;
         }
 
-        // Validação básuca de telefone
+        // Validação básica de telefone
         private function validarTelefone($telefone) {
             $telefone = preg_replace('/[^0-9]/', '', $telefone);
             return strlen($telefone) >= 10 && strlen($telefone) <= 11;
