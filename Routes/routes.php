@@ -235,6 +235,45 @@
             'controller' => 'ConfigController',
             'method' => 'testarConexaoDB'
         ],
+
+        // Rotas para ConvitesController (exigem autenticação, exceto getConvite para o link público)
+
+        // Como Usar (Exemplos de Chamadas)
+        // Criar Convite (Personal logado):
+
+        // POST /convites/criar
+        // Body: {"email": "aluno@example.com"} ou {"idAluno": 1}
+        // Resposta: {"success": true, "link": "https://sua-api.com/convites/abc123..."}
+        // Acessar Link (Aluno):
+
+        // GET /convites/abc123...
+        // Resposta: {"success": true, "data": {"nomePersonal": "João", "nomeAluno": "Maria", ...}}
+        // Frontend: Mostra "João quer ser seu Personal. Aceitar? Negar?"
+        // Aceitar:
+
+        // POST /convites/abc123.../aceitar
+        // Resposta: {"success": true, "message": "Convite aceito!"}
+        // Negar:
+
+        // POST /convites/abc123.../negar
+        // Resposta: {"success": true, "message": "Convite negado."}
+
+        'convites/criar' => [
+            'controller' => 'ConvitesController',
+            'method' => 'criarConvite'
+        ],
+        'convites/([a-zA-Z0-9]{64})' => [  // Captura token de 64 chars (bin2hex(random_bytes(32)))
+            'controller' => 'ConvitesController',
+            'method' => 'getConvite'
+        ],
+        'convites/([a-zA-Z0-9]{64})/aceitar' => [
+            'controller' => 'ConvitesController',
+            'method' => 'aceitarConvite'
+        ],
+        'convites/([a-zA-Z0-9]{64})/negar' => [
+            'controller' => 'ConvitesController',
+            'method' => 'negarConvite'
+        ],
     ];
 
     // Mapeamento de controladores
@@ -245,6 +284,7 @@
         'ConfigController' => __DIR__ . '/../Config/ConfigController.php',
         'AlimentosController' => __DIR__ . '/../Controllers/AlimentosController.php',
         'TreinosController' => __DIR__ . '/../Controllers/TreinosController.php',
+        'ConvitesController' => __DIR__ . '/../Controllers/ConvitesController.php',
     ];
 
     // Função para despachar a requisição
