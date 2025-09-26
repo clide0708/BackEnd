@@ -1,5 +1,3 @@
 # Ignorar arquivos de ambiente
-.env
-.env.*
-".env" 
+.env.production
 node_modules
