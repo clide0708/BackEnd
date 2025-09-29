@@ -308,6 +308,10 @@
         // Rotas públicas que não precisam de autenticação
         $rotasPublicas = [
             'auth/login',
+            'auth/verificar-token',
+            'auth/logout',
+            'auth/obter-usuario',
+            'auth/verificar-autenticacao',
             'cadastro/aluno',
             'cadastro/personal',
             'cadastro/verificar-email',
