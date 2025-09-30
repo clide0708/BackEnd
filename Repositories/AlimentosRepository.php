@@ -71,7 +71,7 @@
         }
 
         public function deleteItem($id) {
-            $stmt = $this->pdo->prepare("DELETE FROM itens_refeicao WHERE id = :id");
+            $stmt = $this->pdo->prepare("DELETE FROM itens_refeicao WHERE idItensRef = :id");
             return $stmt->execute([':id' => $id]);
         }
 
@@ -104,5 +104,4 @@
             ]);
         }
     }
-
 ?>

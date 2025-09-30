@@ -210,18 +210,72 @@
 
 
 
-        // Rotas para Alimentos
 
+
+
+        // Rotas para Alimentos
         'alimentos/buscar' => [
             'controller' => 'AlimentosController',
             'method' => 'buscarAlimentos'
         ],
+        //Exemplo de chamada: GET http://localhost/BackEnd/alimentos/buscar?nome=banana
+        // Retorna lista de alimentos com tradução PT-BR:
+        //         {
+        //     "success": true,
+        //     "resultados": [
+        //         {
+        //             "id": 9003,
+        //             "nome": "banana",
+        //             "nome_original": "apple banana",
+        //             "imagem": "https://spoonacular.com/cdn/ingredients_100x100/apple-banana.png"
+        //         }
+        //     ]
+        // }
 
-        // Exemplo de chamada: GET /alimentos/buscar?nome=banana
-        // Resposta: [{"id":1,"nome":"Banana","calorias":89
-        // ,"proteinas":1.1,"carboidratos":22.8,"gorduras":0.3},...]
+        // Informação detalhada do alimento é buscada em outra rota (ver abaixo)
+
+         // Rota para buscar informação nutricional detalhada de um alimento por ID Spoonacular
+        
+        'alimentos/informacao' => [
+            'controller' => 'AlimentosController',
+            'method' => 'buscarInformacaoAlimento'
+        ],
+        // Exemplo de chamada: GET http://localhost/api/alimentos/informacao?id=9003&quantidade=100&unidade=g
+        // Retorna:
+        // {
+        //     "success": true,
+        //     "alimento": {
+        //         "id": 9003,
+        //         "nome": "banana",
+        //         "nome_original": "apple banana",
+        //         "categoria": "fruit",
+        //         "imagem": "https://spoonacular.com/cdn/ingredients_250x250/apple-banana.png",
+        //         "nutrientes": [
+        //             {
+        //                 "nome": "calorias",
+        //                 "nome_original": "calories",
+        //                 "quantidade": 89,
+        //                 "unidade": "kcal",
+        //                 "percentual_diario": 4.45
+        //             },
+        //             {
+        //                 "nome": "proteínas",
+        //                 "nome_original": "protein",
+        //                 "quantidade": 1.1,
+        //                 "unidade": "g",
+        //                 "percentual_diario": 2.2
+        //             }
+        //         ],
+        //         "quantidade_consulta": 100,
+        //         "unidade_consulta": "g"
+        //     }
+        // }
 
 
+        'alimentos/testar-traducao' => [
+            'controller' => 'AlimentosController',
+            'method' => 'testarTraducao'
+        ],
         'alimentos/listar' => [
             'controller' => 'AlimentosController',
             'method' => 'listarAlimentos'
@@ -242,6 +296,8 @@
             'controller' => 'AlimentosController',
             'method' => 'listarTotais'
         ],
+
+
 
         // Rota para testar conexão
         'config/testarConexao' => [
@@ -355,10 +411,19 @@
             'cadastro/verificar-email',
             'cadastro/verificar-cpf',
             'config/testarConexao',
-            'alimentos/buscar',
             'recuperacao-senha/esqueci-senha',
             'recuperacao-senha/resetar-senha',
-            
+
+            //Todas as rotas GET para buscar alimentos e informações nutricionais
+            'alimentos/buscar',
+            'alimentos/informacao',
+            'alimentos/testar-traducao',
+            // 'alimentos/listar', // Manter protegida, só usuários autenticados podem ver alimentos salvos
+            // 'alimentos/totais', // Manter protegida, só usuários autenticados
+            // 'alimentos/adicionar', // Manter protegida, só usuários autenticados
+            // 'alimentos/remover', // Manter protegida, só usuários autenticados
+            // 'alimentos/atualizar', // Manter protegida, só usuários autenticados
+
             // Rota pública para acessar convite
             // O convite em si é protegido por token único no link
             'convites/([a-zA-Z0-9]{64})',
