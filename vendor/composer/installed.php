@@ -3,7 +3,7 @@
         'name' => 'prototipo-tcc/backend',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '5745c4e37fa9e0211b9b4298373883103718329c',
+        'reference' => '7f2b7c937b0f436193da75dc76db5ff1880da581',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -28,6 +28,15 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'phpmailer/phpmailer' => array(
+            'pretty_version' => 'v6.11.0',
+            'version' => '6.11.0.0',
+            'reference' => '9500c37b70ada2b94f691f527ce11febc0c1998b',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../phpmailer/phpmailer',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'phpoption/phpoption' => array(
             'pretty_version' => '1.9.4',
             'version' => '1.9.4.0',
@@ -40,7 +49,7 @@
         'prototipo-tcc/backend' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '5745c4e37fa9e0211b9b4298373883103718329c',
+            'reference' => '7f2b7c937b0f436193da75dc76db5ff1880da581',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

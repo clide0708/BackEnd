@@ -274,6 +274,30 @@
             'controller' => 'ConvitesController',
             'method' => 'negarConvite'
         ],
+
+        // Rotas para Recuperação de Senha
+        'recuperacao-senha/esqueci-senha' => [
+            'controller' => 'RecuperacaoSenhaController',
+            'method' => 'esqueciSenha'
+        ],
+        // Exemplo de chamada:
+        // POST /recuperacao-senha/esqueci-senha
+        // {
+        //     "email": example.@gmail.com"
+        // }
+
+        'recuperacao-senha/resetar-senha' => [
+            'controller' => 'RecuperacaoSenhaController',
+            'method' => 'resetarSenha'
+        ],
+
+        // Exemplo de chamada:
+        // POST /recuperacao-senha/resetar-senha
+        // {
+        //     "email": example.@gmail.com",
+        //     "codigo": "123456",
+        //     "novaSenha": "novaSenha123"
+        // }
     ];
 
     // Mapeamento de controladores
@@ -285,6 +309,7 @@
         'AlimentosController' => __DIR__ . '/../Controllers/AlimentosController.php',
         'TreinosController' => __DIR__ . '/../Controllers/TreinosController.php',
         'ConvitesController' => __DIR__ . '/../Controllers/ConvitesController.php',
+        'RecuperacaoSenhaController' => __DIR__ . '/../Controllers/RecuperacaoSenhaController.php',
     ];
 
     // Função para despachar a requisição
