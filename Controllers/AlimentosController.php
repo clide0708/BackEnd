@@ -20,6 +20,22 @@
             $this->service = new AlimentosService($repo, $this->pdo);
         }
 
+                // Endpoint para buscar alimentos com tradução
+        public function buscarAlimentos() {
+            header('Content-Type: application/json');
+            try {
+                $termo = filter_input(INPUT_GET, 'nome', FILTER_SANITIZE_STRING);
+                if (!$termo) {
+                    throw new Exception('Termo de busca não informado');
+                }
+                $resultados = $this->service->buscarAlimentosTraduzidos($termo);
+                echo json_encode(['success' => true, 'resultados' => $resultados]);
+            } catch (Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
         public function listarAlimentos()
         {
             header('Content-Type: application/json');
@@ -91,6 +107,8 @@
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
-    }
 
+
+    }
+    
 ?>

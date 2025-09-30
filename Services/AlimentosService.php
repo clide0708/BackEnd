@@ -9,6 +9,121 @@
             $this->pdo = $pdo;
         }
 
+        // Traduz termo PT -> EN com cache
+        public function traduzirParaIngles(string $termoPortugues): string {
+            $termoPortugues = mb_strtolower(trim($termoPortugues));
+
+            // Verifica cache
+            $traducao = $this->repository->getTraducaoIngles($termoPortugues);
+            if ($traducao) {
+                return $traducao;
+            }
+
+            // Se não existir, chama API de tradução externa (exemplo mock)
+            $traducao = $this->chamarApiTraducao($termoPortugues, 'pt', 'en');
+
+            // Salva no cache
+            $this->repository->inserirTraducao($traducao, $termoPortugues);
+
+            return $traducao;
+        }
+
+        // Traduz termo EN -> PT com cache
+        public function traduzirParaPortugues(string $termoIngles): string {
+            $termoIngles = mb_strtolower(trim($termoIngles));
+
+            // Verifica cache
+            $traducao = $this->repository->getTraducaoPortugues($termoIngles);
+            if ($traducao) {
+                return $traducao;
+            }
+
+            // Se não existir, chama API de tradução externa (exemplo mock)
+            $traducao = $this->chamarApiTraducao($termoIngles, 'en', 'pt');
+
+            // Salva no cache
+            $this->repository->inserirTraducao($termoIngles, $traducao);
+
+            return $traducao;
+        }
+
+        // Função mock para tradução (substitua por chamada real a API de tradução)
+        private function chamarApiTraducao(string $texto, string $de, string $para): string {
+            // Aqui você pode integrar Google Translate API, DeepL, etc.
+            // Por enquanto, retorna o texto original para teste.
+            // Para produção, implemente a chamada real.
+
+            // Exemplo simples para teste:
+            if ($de === 'pt' && $para === 'en') {
+                // Mapeamento simples para teste
+                $mapa = [
+                    'banana' => 'banana',
+                    'maçã' => 'apple',
+                    'laranja' => 'orange',
+                    'arroz' => 'rice',
+                    'feijão' => 'beans',
+                    'carboidratos' => 'carbohydrates',
+                    'proteínas' => 'protein',
+                    'gorduras' => 'fat',
+                    'calorias' => 'calories',
+                ];
+                return $mapa[$texto] ?? $texto;
+            } elseif ($de === 'en' && $para === 'pt') {
+                $mapa = [
+                    'banana' => 'banana',
+                    'apple' => 'maçã',
+                    'orange' => 'laranja',
+                    'rice' => 'arroz',
+                    'beans' => 'feijão',
+                    'carbohydrates' => 'carboidratos',
+                    'protein' => 'proteínas',
+                    'fat' => 'gorduras',
+                    'calories' => 'calorias',
+                ];
+                return $mapa[$texto] ?? $texto;
+            }
+
+            return $texto;
+        }
+
+        // Busca alimentos traduzidos (PT -> EN -> Spoonacular -> EN -> PT)
+        public function buscarAlimentosTraduzidos(string $termoPortugues) {
+            if (empty($termoPortugues)) {
+                throw new Exception('Termo de busca não informado');
+            }
+
+            // Traduz para inglês
+            $termoIngles = $this->traduzirParaIngles($termoPortugues);
+
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? 'SUA_API_KEY_SPOONACULAR';
+            $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($termoIngles) . "&number=10&apiKey=$apiKey";
+
+            $response = @file_get_contents($url);
+            if ($response === false) {
+                throw new Exception('Erro ao buscar na API externa');
+            }
+
+            $data = json_decode($response, true);
+            if (!$data || !isset($data['results'])) {
+                throw new Exception('Resposta inválida da API externa');
+            }
+
+            $resultados = [];
+            foreach ($data['results'] as $item) {
+                $nomeIngles = mb_strtolower($item['name']);
+                $nomePortugues = $this->traduzirParaPortugues($nomeIngles);
+
+                $resultados[] = [
+                    'id' => $item['id'],
+                    'nome' => $nomePortugues,
+                    'nome_original' => $item['name'],
+                    // outros campos que desejar retornar
+                ];
+            }
+
+            return $resultados;
+        }
+
         public function listarAlimentos($lista) {
             if (empty($lista)) throw new Exception('Lista não especificada');
             return $this->repository->getByLista($lista);
@@ -131,61 +246,130 @@
             return ['refeicoes'=>$resultado,'totaisGerais'=>$totaisGerais];
         }
 
+
+
+    // Tentativa de função para buscar alimentos traduzidos com cache API Spoonacular (PT -> EN -> API -> EN -> PT)    
+
+    //     public function buscarAlimentosTraduzidos($termoPortugues) {
+    //         if (empty($termoPortugues)) {
+    //             throw new Exception('Termo de busca não informado');
+    //         }
+
+    //         // Traduz para inglês para buscar na API externa
+    //         $termoIngles = $this->traduzirParaIngles($termoPortugues);
+
+    //         $apiKey = "SUA_API_KEY_SPOONACULAR";
+    //         $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($termoIngles) . "&number=10&apiKey=$apiKey";
+
+    //         $response = @file_get_contents($url);
+    //         if ($response === false) {
+    //             throw new Exception('Erro ao buscar na API externa');
+    //         }
+
+    //         $data = json_decode($response, true);
+    //         if (!$data || !isset($data['results'])) {
+    //             throw new Exception('Resposta inválida da API externa');
+    //         }
+
+    //         $resultados = [];
+    //         foreach ($data['results'] as $item) {
+    //             $nomeIngles = $item['name'];
+    //             $nomePortugues = $this->traduzirComCache($nomeIngles);
+
+    //             $resultados[] = [
+    //                 'id' => $item['id'],
+    //                 'nome' => $nomePortugues,
+    //                 'nome_original' => $nomeIngles,
+    //                 // outros campos que desejar retornar
+    //             ];
+    //         }
+
+    //         return $resultados;
+    //     }
         
-        private function traduzirComCache($termoIngles) {
-            // Verifica se já existe tradução no cache
-            $stmt = $this->pdo->prepare("SELECT termo_portugues FROM traducoes_alimentos WHERE termo_ingles = :termo");
-            $stmt->execute([':termo' => $termoIngles]);
-            $traducao = $stmt->fetchColumn();
+    //     private function traduzirParaIngles($termoPortugues) {
+    //         // Verifica se já existe tradução no cache invertido (portugues -> ingles)
+    //         $stmt = $this->pdo->prepare("SELECT termo_ingles FROM traducoes_alimentos WHERE termo_portugues = :termo");
+    //         $stmt->execute([':termo' => $termoPortugues]);
+    //         $traducao = $stmt->fetchColumn();
+
+    //         if ($traducao) {
+    //             return $traducao;
+    //         }
+
+    //         // Se não existir, faça a tradução (exemplo usando API externa ou mock)
+    //         // Aqui você deve implementar a chamada para um serviço de tradução real
+    //         // Exemplo fictício:
+    //         $traducao = $this->chamarApiTraducao($termoPortugues, 'pt', 'en');
+
+    //         // Salva no cache invertido para futuras consultas
+    //         $stmt = $this->pdo->prepare("INSERT INTO traducoes_alimentos (termo_ingles, termo_portugues) VALUES (:ingles, :portugues)");
+    //         $stmt->execute([':ingles' => $traducao, ':portugues' => $termoPortugues]);
+
+    //         return $traducao;
+    //     }
+
+    //     // Exemplo de função fictícia para chamar API de tradução
+    //     private function chamarApiTraducao($texto, $de, $para) {
+    //         // Implemente aqui a chamada real para um serviço de tradução, ex: Google Translate API
+    //         // Por enquanto, retorne o texto original para teste
+    //         return $texto; // Substitua pela tradução real
+    //     }
+
+    //     private function traduzirComCache($termoIngles) {
+    //         // Verifica se já existe tradução no cache
+    //         $stmt = $this->pdo->prepare("SELECT termo_portugues FROM traducoes_alimentos WHERE termo_ingles = :termo");
+    //         $stmt->execute([':termo' => $termoIngles]);
+    //         $traducao = $stmt->fetchColumn();
             
-            if ($traducao) {
-                return $traducao;
-            }
+    //         if ($traducao) {
+    //             return $traducao;
+    //         }
             
-            // Se não existir, traduz e salva no cache
-            $traducao = $this->traduzirParaPortugues($termoIngles);
+    //         // Se não existir, traduz e salva no cache
+    //         $traducao = $this->traduzirParaPortugues($termoIngles);
             
-            $stmt = $this->pdo->prepare("INSERT INTO traducoes_alimentos (termo_ingles, termo_portugues) VALUES (:ingles, :portugues)");
-            $stmt->execute([':ingles' => $termoIngles, ':portugues' => $traducao]);
+    //         $stmt = $this->pdo->prepare("INSERT INTO traducoes_alimentos (termo_ingles, termo_portugues) VALUES (:ingles, :portugues)");
+    //         $stmt->execute([':ingles' => $termoIngles, ':portugues' => $traducao]);
             
-            return $traducao;
-        }
+    //         return $traducao;
+    //     }
         
-        // função auxiliar para buscar nutrientes na API
-        private function buscarNutrientesAPI($nome) {
-            $apiKey = "617d584fd753442483088b758ccd52fd";
+    //     // função auxiliar para buscar nutrientes na API
+    //     private function buscarNutrientesAPI($nome) {
+    //         $apiKey = "617d584fd753442483088b758ccd52fd";
             
-            // Traduz o termo de pesquisa para inglês
-            $nomeIngles = $this->traduzirParaIngles($nome);
+    //         // Traduz o termo de pesquisa para inglês
+    //         $nomeIngles = $this->traduzirParaIngles($nome);
             
-            $searchUrl = "https://api.spoonacular.com/food/ingredients/search?query=".urlencode($nomeIngles)."&number=1&apiKey=$apiKey";
-            $searchData = json_decode(@file_get_contents($searchUrl), true);
+    //         $searchUrl = "https://api.spoonacular.com/food/ingredients/search?query=".urlencode($nomeIngles)."&number=1&apiKey=$apiKey";
+    //         $searchData = json_decode(@file_get_contents($searchUrl), true);
 
-            $nutrientes = ['calorias'=>0,'proteinas'=>0,'carboidratos'=>0,'gorduras'=>0,'unidade'=>'g'];
+    //         $nutrientes = ['calorias'=>0,'proteinas'=>0,'carboidratos'=>0,'gorduras'=>0,'unidade'=>'g'];
 
-            if ($searchData && isset($searchData['results'][0]['id'])) {
-                $ingredientId = $searchData['results'][0]['id'];
-                $nutriUrl = "https://api.spoonacular.com/food/ingredients/$ingredientId/information?amount=100&unit=gram&apiKey=$apiKey";
-                $nutriData = json_decode(@file_get_contents($nutriUrl), true);
+    //         if ($searchData && isset($searchData['results'][0]['id'])) {
+    //             $ingredientId = $searchData['results'][0]['id'];
+    //             $nutriUrl = "https://api.spoonacular.com/food/ingredients/$ingredientId/information?amount=100&unit=gram&apiKey=$apiKey";
+    //             $nutriData = json_decode(@file_get_contents($nutriUrl), true);
 
-                if ($nutriData) {
-                    // Traduz o nome do alimento
-                    $nomeTraduzido = $this->traduzirComCache($searchData['results'][0]['name']);
+    //             if ($nutriData) {
+    //                 // Traduz o nome do alimento
+    //                 $nomeTraduzido = $this->traduzirComCache($searchData['results'][0]['name']);
                     
-                    if ($nutriData && isset($nutriData['nutrition']['nutrients'])) {
-                        foreach ($nutriData['nutrition']['nutrients'] as $nutriente) {
-                            $n = strtolower($nutriente['name']);
-                            if ($n==='calories') $nutrientes['calorias']=$nutriente['amount'];
-                            if ($n==='protein') $nutrientes['proteinas']=$nutriente['amount'];
-                            if ($n==='carbohydrates') $nutrientes['carboidratos']=$nutriente['amount'];
-                            if ($n==='fat') $nutrientes['gorduras']=$nutriente['amount'];
-                        }
-                    }
-                }
-            }
+    //                 if ($nutriData && isset($nutriData['nutrition']['nutrients'])) {
+    //                     foreach ($nutriData['nutrition']['nutrients'] as $nutriente) {
+    //                         $n = strtolower($nutriente['name']);
+    //                         if ($n==='calories') $nutrientes['calorias']=$nutriente['amount'];
+    //                         if ($n==='protein') $nutrientes['proteinas']=$nutriente['amount'];
+    //                         if ($n==='carbohydrates') $nutrientes['carboidratos']=$nutriente['amount'];
+    //                         if ($n==='fat') $nutrientes['gorduras']=$nutriente['amount'];
+    //                     }
+    //                 }
+    //             }
+    //         }
 
-            return $nutrientes;
-        }
+    //         return $nutrientes;
+    //     }
 
     }
 
