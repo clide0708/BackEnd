@@ -39,21 +39,50 @@
             $nome = trim($data['nome']);
             $tipo = $data['tipo'];
             $criadoPor = trim($data['criadoPor'] ?? '');
-            $idAluno = $data['idAluno'] ?? null;
-            $idPersonal = $data['idPersonal'] ?? null;
+            $idAluno = isset($data['idAluno']) ? (is_numeric($data['idAluno']) ? (int)$data['idAluno'] : null) : null;
+            $idPersonal = isset($data['idPersonal']) ? (is_numeric($data['idPersonal']) ? (int)$data['idPersonal'] : null) : null;
             $descricao = $data['descricao'] ?? null;
             $exercicios = $data['exercicios'] ?? [];
+
+            // Validar que pelo menos um dos dois IDs foi informado
+            if (is_null($idAluno) && is_null($idPersonal)) {
+                http_response_code(400);
+                echo json_encode(['success'=>false, 'error'=>'Informe pelo menos idAluno ou idPersonal']);
+                return;
+            }
+
+            // Validar existência do aluno, se informado
+            if (!is_null($idAluno)) {
+                $stmt = $this->db->prepare("SELECT 1 FROM alunos WHERE idAluno = ?");
+                $stmt->execute([$idAluno]);
+                if (!$stmt->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(['success'=>false, 'error'=>'Aluno não encontrado']);
+                    return;
+                }
+            }
+
+            // Validar existência do personal, se informado
+            if (!is_null($idPersonal)) {
+                $stmt = $this->db->prepare("SELECT 1 FROM personal WHERE idPersonal = ?");
+                $stmt->execute([$idPersonal]);
+                if (!$stmt->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(['success'=>false, 'error'=>'Personal não encontrado']);
+                    return;
+                }
+            }
 
             $now = date('Y-m-d H:i:s');
 
             try {
                 $this->db->beginTransaction();
 
-                // Inserir treino
+                // Inserir treino, passando NULL para idAluno ou idPersonal se não informado
                 $stmt = $this->db->prepare("INSERT INTO treinos (idAluno, idPersonal, criadoPor, nome, tipo, descricao, data_criacao, data_ultima_modificacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
-                    $idAluno ?? 0,
-                    $idPersonal ?? 0,
+                    $idAluno,       // pode ser null
+                    $idPersonal,    // pode ser null
                     $criadoPor,
                     $nome,
                     $tipo,
