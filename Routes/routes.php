@@ -208,7 +208,20 @@
         ],
         // Exemplo de chamada: GET /treinos/buscarCompleto/123
 
+
+
         // Rotas para Alimentos
+
+        'alimentos/buscar' => [
+            'controller' => 'AlimentosController',
+            'method' => 'buscarAlimentos'
+        ],
+
+        // Exemplo de chamada: GET /alimentos/buscar?nome=banana
+        // Resposta: [{"id":1,"nome":"Banana","calorias":89
+        // ,"proteinas":1.1,"carboidratos":22.8,"gorduras":0.3},...]
+
+
         'alimentos/listar' => [
             'controller' => 'AlimentosController',
             'method' => 'listarAlimentos'
@@ -341,6 +354,14 @@
             'cadastro/personal',
             'cadastro/verificar-email',
             'cadastro/verificar-cpf',
+            'config/testarConexao',
+            'alimentos/buscar',
+            'recuperacao-senha/esqueci-senha',
+            'recuperacao-senha/resetar-senha',
+            
+            // Rota pública para acessar convite
+            // O convite em si é protegido por token único no link
+            'convites/([a-zA-Z0-9]{64})',
         ];
         // Se a rota não for pública, exige autenticação
         if (!in_array($clean_path, $rotasPublicas)) {

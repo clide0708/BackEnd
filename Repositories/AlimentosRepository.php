@@ -7,6 +7,35 @@
             $this->pdo = $pdo;
         }
 
+        //Sessão de traduções API Spoonacular
+
+        // Busca tradução PT -> EN
+        public function getTraducaoIngles(string $termoPortugues): ?string {
+            $stmt = $this->pdo->prepare("SELECT termo_ingles FROM traducoes_alimentos WHERE termo_portugues = :termo LIMIT 1");
+            $stmt->execute([':termo' => $termoPortugues]);
+            $result = $stmt->fetchColumn();
+            return $result ?: null;
+        }
+
+        // Busca tradução EN -> PT
+        public function getTraducaoPortugues(string $termoIngles): ?string {
+            $stmt = $this->pdo->prepare("SELECT termo_portugues FROM traducoes_alimentos WHERE termo_ingles = :termo LIMIT 1");
+            $stmt->execute([':termo' => $termoIngles]);
+            $result = $stmt->fetchColumn();
+            return $result ?: null;
+        }
+
+        // Insere nova tradução
+        public function inserirTraducao(string $termoIngles, string $termoPortugues): bool {
+            try {
+                $stmt = $this->pdo->prepare("INSERT INTO traducoes_alimentos (termo_ingles, termo_portugues) VALUES (:ingles, :portugues)");
+                return $stmt->execute([':ingles' => $termoIngles, ':portugues' => $termoPortugues]);
+            } catch (PDOException $e) {
+                // Pode ser duplicata, ignorar erro
+                return false;
+            }
+        }
+
         public function getByLista($lista) {
             $stmt = $this->pdo->prepare("
                 SELECT 
