@@ -95,7 +95,7 @@
             // Traduz para inglês
             $termoIngles = $this->traduzirParaIngles($termoPortugues);
 
-            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? 'SUA_API_KEY_SPOONACULAR';
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
             $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($termoIngles) . "&number=10&apiKey=$apiKey";
 
             $response = @file_get_contents($url);
