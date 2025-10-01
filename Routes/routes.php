@@ -416,24 +416,16 @@ function dispatch($path, $routes, $controller_paths, $method_http)
         'cadastro/personal',
         'cadastro/verificar-email',
         'cadastro/verificar-cpf',
+        'cadastro/verificar-rg',
         'config/testarConexao',
         'recuperacao-senha/esqueci-senha',
         'recuperacao-senha/resetar-senha',
-
-        //Todas as rotas GET para buscar alimentos e informações nutricionais
         'alimentos/buscar',
         'alimentos/informacao',
         'alimentos/testar-traducao',
-        // 'alimentos/listar', // Manter protegida, só usuários autenticados podem ver alimentos salvos
-        // 'alimentos/totais', // Manter protegida, só usuários autenticados
-        // 'alimentos/adicionar', // Manter protegida, só usuários autenticados
-        // 'alimentos/remover', // Manter protegida, só usuários autenticados
-        // 'alimentos/atualizar', // Manter protegida, só usuários autenticados
-
-        // Rota pública para acessar convite
-        // O convite em si é protegido por token único no link
         'convites/([a-zA-Z0-9]{64})',
     ];
+    
     // Se a rota não for pública, exige autenticação
     if (!in_array($clean_path, $rotasPublicas)) {
         autenticar();
