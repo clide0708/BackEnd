@@ -34,7 +34,7 @@
             return $traducao ?: $termoPortugues;
         }
 
-        // Traduz termo EN -> PT com cache - MELHORADA para termos compostos
+        // Traduz termo EN -> PT com contexto alimentar brasileiro
         public function traduzirParaPortugues(string $termoIngles): string {
             $termoIngles = mb_strtolower(trim($termoIngles));
             
@@ -48,15 +48,15 @@
                 return $traducao;
             }
 
-            // Tenta traduzir termos compostos específicos de alimentos
-            $traducaoComposta = $this->traduzirTermoComposto($termoIngles);
-            if ($traducaoComposta && $traducaoComposta !== $termoIngles) {
-                $this->repository->inserirTraducao($termoIngles, $traducaoComposta);
-                return $traducaoComposta;
+            // Tenta tradução contextual inteligente primeiro
+            $traducaoContextual = $this->traducaoContextualAlimentos($termoIngles);
+            if ($traducaoContextual && $traducaoContextual !== $termoIngles) {
+                $this->repository->inserirTraducao($termoIngles, $traducaoContextual);
+                return $traducaoContextual;
             }
 
-            // Se não for termo composto conhecido, chama API de tradução
-            $traducao = $this->chamarApiTraducaoReal($termoIngles, 'en', 'pt');
+            // Se não for termo conhecido, chama API de tradução com tratamento de frases
+            $traducao = $this->traduzirFraseInteligente($termoIngles);
 
             // Salva no cache
             if ($traducao && $traducao !== $termoIngles) {
@@ -66,44 +66,48 @@
             return $traducao ?: $termoIngles;
         }
 
-        // NOVO MÉTODO: Traduz termos compostos específicos de alimentos
-        private function traduzirTermoComposto(string $termoIngles): string {
-            $termosCompostos = [
-                // Frutas e vegetais
-                'banana leaves' => 'folhas de bananeira',
-                'banana chips' => 'chips de banana',
-                'banana bread' => 'pão de banana',
-                'banana pepper' => 'pimenta banana',
-                'pink banana squash' => 'abóbora banana rosa',
-                'banana blossoms' => 'flores de bananeira',
-                'banana pepper rings' => 'anéis de pimenta banana',
-                'banana liqueur' => 'licor de banana',
-                'banana extract' => 'extrato de banana',
-                'apple juice' => 'suco de maçã',
-                'orange juice' => 'suco de laranja',
-                'pineapple juice' => 'suco de abacaxi',
-                'tomato sauce' => 'molho de tomate',
-                'tomato paste' => 'extrato de tomate',
-                'cherry tomatoes' => 'tomates cereja',
-                'sweet corn' => 'milho doce',
-                'green peas' => 'ervilhas',
-                'red pepper' => 'pimentão vermelho',
-                'green pepper' => 'pimentão verde',
-                'yellow pepper' => 'pimentão amarelo',
-                'hot pepper' => 'pimenta picante',
+        // TRADUÇÃO CONTEXTUAL INTELIGENTE - Nomes reais de alimentos no Brasil
+        private function traducaoContextualAlimentos(string $termoIngles): string {
+            $dicionarioAlimentos = [
+                // Massas e Panificação
+                'filo pastry' => 'massa folhada',
+                'puff pastry dough' => 'massa folhada',
+                'puff pastry' => 'massa folhada',
+                'lasagne noodles' => 'massa para lasanha',
+                'lasagne sheets' => 'massa para lasanha',
+                'lasagna noodles' => 'massa para lasanha',
+                'fresh lasagne sheets' => 'massa para lasanha fresca',
+                'cooked lasagne noodles' => 'massa para lasanha cozida',
+                'cooked lasagna noodles' => 'massa para lasanha cozida',
+                'oven ready lasagne noodles' => 'massa para lasanha pré-cozida',
+                'oven ready lasagna noodles' => 'massa para lasanha pré-cozida',
+                'graham crackers' => 'biscoito maisena',
+                'sheet gelatin' => 'gelatina em folha',
+                'pastry dough' => 'massa folhada',
+                'pie crust' => 'massa de torta',
+                'pizza dough' => 'massa de pizza',
                 
-                // Carnes e proteínas
+                // Folhas e Vegetais
+                'banana leaves' => 'folha de bananeira',
+                'lettuce' => 'alface',
+                'spinach' => 'espinafre',
+                'kale' => 'couve',
+                'cabbage' => 'repolho',
+                'nori' => 'alga nori',
+                'bean curd sheets' => 'folha de tofu',
+                'curry leaves' => 'folhas de curry',
+                'mint leaves' => 'folhas de hortelã',
+                'basil leaves' => 'folhas de manjericão',
+                
+                // Carnes
                 'chicken breast' => 'peito de frango',
                 'chicken thigh' => 'coxa de frango',
                 'chicken wing' => 'asa de frango',
                 'chicken leg' => 'sobrecoxa de frango',
-                'pork chop' => 'costeleta de porco',
-                'pork loin' => 'lombo de porco',
                 'beef steak' => 'bife',
                 'ground beef' => 'carne moída',
-                'salmon fillet' => 'filé de salmão',
-                'tuna fish' => 'atum',
-                'turkey breast' => 'peito de peru',
+                'pork chop' => 'costeleta de porco',
+                'pork loin' => 'lombo de porco',
                 'bacon strips' => 'fatias de bacon',
                 'sausage links' => 'linguiças',
                 
@@ -111,25 +115,26 @@
                 'cream cheese' => 'cream cheese',
                 'cottage cheese' => 'queijo cottage',
                 'parmesan cheese' => 'queijo parmesão',
-                'mozzarella cheese' => 'queijo mussarela',
+                'mozzarella cheese' => 'muçarela',
                 'cheddar cheese' => 'queijo cheddar',
                 'greek yogurt' => 'iogurte grego',
-                'sour cream' => 'creme de leite azedo',
-                'whipped cream' => 'creme chantilly',
+                'sour cream' => 'creme azedo',
+                'whipped cream' => 'chantilly',
                 'ice cream' => 'sorvete',
                 'condensed milk' => 'leite condensado',
+                'evaporated milk' => 'leite evaporado',
                 
-                // Grãos e cereais
+                // Grãos e Cereais
                 'brown rice' => 'arroz integral',
                 'white rice' => 'arroz branco',
                 'wild rice' => 'arroz selvagem',
                 'whole wheat' => 'trigo integral',
-                'oatmeal' => 'aveia',
+                'oatmeal' => 'aveia em flocos',
                 'whole grain' => 'grão integral',
                 'bread crumbs' => 'farinha de rosca',
                 'pasta sauce' => 'molho para massa',
                 
-                // Nozes e sementes
+                // Nozes e Sementes
                 'peanut butter' => 'manteiga de amendoim',
                 'almond milk' => 'leite de amêndoa',
                 'coconut milk' => 'leite de coco',
@@ -138,43 +143,205 @@
                 'flax seeds' => 'sementes de linhaça',
                 'pumpkin seeds' => 'sementes de abóbora',
                 
-                // Vegetais
-                'sweet potato' => 'batata doce',
-                'green beans' => 'vagem',
-                'bell pepper' => 'pimentão',
-                'cherry tomato' => 'tomate cereja',
-                'red onion' => 'cebola roxa',
-                'brussels sprouts' => 'couve de bruxelas',
-                'cauliflower rice' => 'arroz de couve-flor',
-                'spinach leaves' => 'folhas de espinafre',
-                'kale chips' => 'chips de couve',
+                // Frutas
+                'banana' => 'banana',
+                'apple' => 'maçã',
+                'orange' => 'laranja',
+                'strawberry' => 'morango',
+                'pineapple' => 'abacaxi',
+                'grape' => 'uva',
+                'mango' => 'manga',
+                'papaya' => 'mamão',
+                'lemon' => 'limão',
+                'lime' => 'lima',
                 
-                // Outros alimentos compostos
+                // Legumes
+                'carrot' => 'cenoura',
+                'potato' => 'batata',
+                'tomato' => 'tomato',
+                'onion' => 'cebola',
+                'garlic' => 'alho',
+                'bell pepper' => 'pimentão',
+                'cucumber' => 'pepino',
+                'zucchini' => 'abobrinha',
+                'eggplant' => 'berinjela',
+                'broccoli' => 'brócolis',
+                
+                // Bebidas
+                'orange juice' => 'suco de laranja',
+                'apple juice' => 'suco de maçã',
+                'pineapple juice' => 'suco de abacaxi',
+                'green tea' => 'chá verde',
+                'black tea' => 'chá preto',
+                'coffee' => 'café',
+                
+                // Temperos e Condimentos
                 'olive oil' => 'azeite de oliva',
                 'coconut oil' => 'óleo de coco',
                 'vegetable oil' => 'óleo vegetal',
                 'soy sauce' => 'molho de soja',
                 'maple syrup' => 'xarope de bordo',
-                'vanilla extract' => 'extrato de baunilha',
+                'vanilla extract' => 'baunilha',
                 'baking powder' => 'fermento em pó',
                 'baking soda' => 'bicarbonato de sódio',
+                'cocoa powder' => 'cacau em pó',
+                'cinnamon' => 'canela',
+                
+                // Outros
                 'whole milk' => 'leite integral',
                 'skim milk' => 'leite desnatado',
                 'chocolate chips' => 'gotas de chocolate',
-                'cocoa powder' => 'cacau em pó'
+                'yeast' => 'fermento biológico',
+                'honey' => 'mel',
+                'sugar' => 'açúcar',
+                'salt' => 'sal',
+                'pepper' => 'pimenta',
+                
+                // Termos culinários
+                'fresh' => 'fresco',
+                'cooked' => 'cozido',
+                'baked' => 'assado',
+                'fried' => 'frito',
+                'roasted' => 'tostado',
+                'grilled' => 'grelhado',
+                'raw' => 'cru',
+                'frozen' => 'congelado',
+                'canned' => 'enlatado',
+                'dried' => 'seco',
+                'powdered' => 'em pó',
+                'crushed' => 'triturado',
+                'sliced' => 'fatiado',
+                'chopped' => 'picado',
+                'grated' => 'ralado',
+                'minced' => 'moído'
             ];
 
-            return $termosCompostos[$termoIngles] ?? $termoIngles;
+            return $dicionarioAlimentos[$termoIngles] ?? $termoIngles;
+        }
+
+        // TRADUÇÃO INTELIGENTE DE FRASES - Mantém ordem gramatical correta
+        private function traduzirFraseInteligente(string $fraseIngles): string {
+            // Se for uma única palavra, usa tradução simples
+            if (strpos($fraseIngles, ' ') === false) {
+                return $this->chamarApiTraducaoReal($fraseIngles, 'en', 'pt');
+            }
+
+            // Verifica se é uma frase conhecida no dicionário
+            $traducaoFrase = $this->traducaoContextualAlimentos($fraseIngles);
+            if ($traducaoFrase !== $fraseIngles) {
+                return $traducaoFrase;
+            }
+
+            // Divide a frase em palavras
+            $palavras = explode(' ', $fraseIngles);
+            
+            // Traduz cada palavra individualmente
+            $palavrasTraduzidas = [];
+            foreach ($palavras as $palavra) {
+                $palavrasTraduzidas[] = $this->chamarApiTraducaoReal($palavra, 'en', 'pt');
+            }
+
+            // Reorganiza a frase na ordem gramatical correta do português
+            return $this->reorganizarOrdemPortugues($palavrasTraduzidas, $fraseIngles);
+        }
+
+        // REORGANIZA A ORDEM PARA O PORTUGUÊS CORRETO
+        private function reorganizarOrdemPortugues(array $palavras, string $original): string {
+            $frase = implode(' ', $palavras);
+            
+            // Corrige ordens específicas que são diferentes entre inglês e português
+            $correcoesGramaticais = [
+                // Padrão: adjetivo + substantivo (EN) -> substantivo + adjetivo (PT)
+                '/(\w+)\s+(fresh|frozen|cooked|baked|fried|raw|dried|powdered|crushed|sliced|chopped|grated|minced|roasted|grilled)$/' => '$2 $1',
+                
+                // Exemplos específicos comuns
+                'cream cheese' => 'cream cheese',
+                'cottage cheese' => 'queijo cottage',
+                'parmesan cheese' => 'queijo parmesão',
+                'lasagne noodles' => 'massa para lasanha',
+                'banana leaves' => 'folhas de bananeira',
+                'bean curd' => 'tofu',
+                'puff pastry' => 'massa folhada',
+                'graham crackers' => 'biscoito maisena',
+                'sheet gelatin' => 'gelatina em folha',
+                'orange juice' => 'suco de laranja',
+                'apple juice' => 'suco de maçã',
+                'chocolate chips' => 'gotas de chocolate',
+                'baking powder' => 'fermento em pó',
+                'baking soda' => 'bicarbonato de sódio'
+            ];
+
+            // Aplica correções gramaticais
+            foreach ($correcoesGramaticais as $padrao => $substituicao) {
+                if (preg_match('/' . preg_quote($padrao, '/') . '/', $frase)) {
+                    $frase = str_replace($padrao, $substituicao, $frase);
+                } elseif (preg_match($padrao, $frase)) {
+                    $frase = preg_replace($padrao, $substituicao, $frase);
+                }
+            }
+
+            // Remove duplos espaços
+            $frase = preg_replace('/\s+/', ' ', $frase);
+            
+            return trim($frase);
+        }
+
+        // DICIONÁRIO DE EXCEÇÕES - Alimentos que não seguem regras gerais
+        private function obterTraducaoExcecao(string $termoIngles): ?string {
+            $excecoes = [
+                // Ingredientes japoneses
+                'nori' => 'alga nori',
+                'tofu' => 'tofu',
+                'miso' => 'missô',
+                'sake' => 'saquê',
+                'wasabi' => 'wasabi',
+                'sashimi' => 'sashimi',
+                'sushi' => 'sushi',
+                'tempura' => 'tempurá',
+                'edamame' => 'edamame',
+                'kimchi' => 'kimchi',
+                'ramen' => 'lámen',
+                
+                // Massas italianas
+                'pasta' => 'massa',
+                'spaghetti' => 'espaguete',
+                'fettuccine' => 'fettuccine',
+                'lasagna' => 'lasanha',
+                'ravioli' => 'ravioli',
+                'tortellini' => 'tortellini',
+                'gnocchi' => 'nhoque',
+                'penne' => 'penne',
+                'fusilli' => 'fusilli',
+                'macaroni' => 'macarrão',
+                
+                // Queijos
+                'provolone' => 'provolone',
+                'gorgonzola' => 'gorgonzola',
+                'ricotta' => 'ricota',
+                'brie' => 'brie',
+                'camembert' => 'camembert',
+                'gouda' => 'gouda',
+                'feta' => 'feta',
+                'manchego' => 'manchego',
+                
+                // Outros
+                'hummus' => 'homus',
+                'tabbouleh' => 'tabule',
+                'guacamole' => 'guacamole',
+                'salsa' => 'salsa',
+                'curry' => 'curry',
+                'chutney' => 'chutney'
+            ];
+
+            return $excecoes[$termoIngles] ?? null;
         }
 
         // Função principal para chamar API de tradução real
         private function chamarApiTraducaoReal(string $texto, string $de, string $para): string {
-            // Para termos compostos, tenta quebrar e traduzir separadamente
-            if (strpos($texto, ' ') !== false) {
-                $traducaoComposta = $this->traduzirTermoCompostoQuebrado($texto, $de, $para);
-                if ($traducaoComposta && $traducaoComposta !== $texto) {
-                    return $traducaoComposta;
-                }
+            // Verifica se é uma exceção primeiro
+            $excecao = $this->obterTraducaoExcecao($texto);
+            if ($excecao) {
+                return $excecao;
             }
 
             // Tenta LibreTranslate primeiro (gratuito)
@@ -193,28 +360,7 @@
             return $this->mapeamentoLocal($texto, $de, $para);
         }
 
-        // NOVO MÉTODO: Traduz termos compostos quebrando em partes
-        private function traduzirTermoCompostoQuebrado(string $texto, string $de, string $para): string {
-            $partes = explode(' ', $texto);
-            $traducoes = [];
-            
-            foreach ($partes as $parte) {
-                if ($de === 'en' && $para === 'pt') {
-                    $traducoes[] = $this->traduzirParaPortugues($parte);
-                } else {
-                    $traducoes[] = $this->traduzirParaIngles($parte);
-                }
-            }
-            
-            // Junta as traduções (em português usa "de" para ligar palavras)
-            if ($para === 'pt') {
-                return implode(' ', $traducoes);
-            } else {
-                return implode(' ', $traducoes);
-            }
-        }
-
-        // LibreTranslate API (Gratuita e Open Source)
+        // LibreTranslate API
         private function chamarLibreTranslate(string $texto, string $de, string $para): ?string {
             $url = "https://libretranslate.de/translate";
             
@@ -230,7 +376,7 @@
                     'header' => "Content-type: application/json\r\n",
                     'method' => 'POST',
                     'content' => json_encode($dados),
-                    'timeout' => 10
+                    'timeout' => 5
                 ]
             ];
 
@@ -254,7 +400,7 @@
             return null;
         }
 
-        // MyMemory Translation API (Gratuita até 1000 requests/dia)
+        // MyMemory Translation API
         private function chamarMyMemoryTranslate(string $texto, string $de, string $para): ?string {
             $de = $de === 'pt' ? 'pt-BR' : $de;
             $para = $para === 'pt' ? 'pt-BR' : $para;
@@ -264,7 +410,7 @@
             
             try {
                 $resposta = @file_get_contents($url, false, stream_context_create([
-                    'http' => ['timeout' => 10]
+                    'http' => ['timeout' => 5]
                 ]));
                 
                 if ($resposta === false) {
@@ -284,226 +430,61 @@
             return null;
         }
 
-        // Mapeamento local como fallback final
+        // Mapeamento local básico
         private function mapeamentoLocal(string $texto, string $de, string $para): string {
-            $mapaCompleto = [
-                // PT -> EN
-                'pt-en' => [
-                    'banana' => 'banana',
-                    'maçã' => 'apple',
-                    'maça' => 'apple',
-                    'laranja' => 'orange',
-                    'abacaxi' => 'pineapple',
-                    'morango' => 'strawberry',
-                    'uva' => 'grape',
-                    'mamão' => 'papaya',
-                    'manga' => 'mango',
-                    'limão' => 'lemon',
-                    'pera' => 'pear',
-                    'arroz' => 'rice',
-                    'feijão' => 'beans',
-                    'feijao' => 'beans',
-                    'macarrão' => 'pasta',
-                    'macarrao' => 'pasta',
-                    'pão' => 'bread',
-                    'pao' => 'bread',
-                    'carne' => 'meat',
-                    'frango' => 'chicken',
-                    'peixe' => 'fish',
-                    'ovo' => 'egg',
-                    'leite' => 'milk',
-                    'queijo' => 'cheese',
-                    'iogurte' => 'yogurt',
-                    'aveia' => 'oats',
-                    'amêndoa' => 'almond',
-                    'amendoa' => 'almond',
-                    'castanha' => 'nut',
-                    'brócolis' => 'broccoli',
-                    'brocolis' => 'broccoli',
-                    'cenoura' => 'carrot',
-                    'alface' => 'lettuce',
-                    'tomate' => 'tomato',
-                    'batata' => 'potato',
-                    'cebola' => 'onion',
-                    'alho' => 'garlic',
-                    'açúcar' => 'sugar',
-                    'acucar' => 'sugar',
-                    'sal' => 'salt',
-                    'óleo' => 'oil',
-                    'oleo' => 'oil',
-                    'manteiga' => 'butter',
-                    'carboidratos' => 'carbohydrates',
-                    'proteínas' => 'protein',
-                    'proteinas' => 'protein',
-                    'gorduras' => 'fat',
-                    'calorias' => 'calories',
-                    'fibras' => 'fiber',
-                    'vitaminas' => 'vitamins',
-                    'minerais' => 'minerals',
-                    'sódio' => 'sodium',
-                    'sodio' => 'sodium',
-                    'colesterol' => 'cholesterol',
-                    'água' => 'water',
-                    'agua' => 'water',
-                    'café' => 'coffee',
-                    'cafe' => 'coffee',
-                    'chá' => 'tea',
-                    'cha' => 'tea',
-                    'iogurte' => 'yogurt',
-                    'aveia' => 'oats',
-                    'mel' => 'honey',
-                    'chocolate' => 'chocolate',
-                    'bolo' => 'cake',
-                    'pizza' => 'pizza',
-                    'hambúrguer' => 'hamburger',
-                    'hamburguer' => 'hamburger',
-                    'sorvete' => 'ice cream',
-                    'biscoito' => 'cookie',
-                    'bolacha' => 'cookie',
-                    'salgado' => 'savory',
-                    'doce' => 'sweet',
-                    'azedo' => 'sour',
-                    'amargo' => 'bitter',
-                    'salgado' => 'salty',
-                    'folhas' => 'leaves',
-                    'chips' => 'chips',
-                    'pão' => 'bread',
-                    'pimenta' => 'pepper',
-                    'abóbora' => 'squash',
-                    'flores' => 'blossoms',
-                    'anéis' => 'rings',
-                    'licor' => 'liqueur',
-                    'extrato' => 'extract',
-                    'suco' => 'juice',
-                    'molho' => 'sauce',
-                    'ervilhas' => 'peas',
-                    'milho' => 'corn',
-                    'costeleta' => 'chop',
-                    'lombo' => 'loin',
-                    'bife' => 'steak',
-                    'linguiça' => 'sausage',
-                    'bacon' => 'bacon',
-                    'creme' => 'cream',
-                    'leite' => 'milk',
-                    'farinha' => 'flour',
-                    'fermento' => 'yeast',
-                    'grão' => 'grain',
-                    'manteiga' => 'butter',
-                    'sementes' => 'seeds',
-                    'couve' => 'kale',
-                    'espinafre' => 'spinach',
-                    'azeite' => 'olive oil',
-                    'xarope' => 'syrup',
-                    'baunilha' => 'vanilla',
-                    'cacau' => 'cocoa'
-                ],
-                
+            $mapaBasico = [
                 // EN -> PT
                 'en-pt' => [
-                    'banana' => 'banana',
-                    'apple' => 'maçã',
-                    'orange' => 'laranja',
-                    'pineapple' => 'abacaxi',
-                    'strawberry' => 'morango',
-                    'grape' => 'uva',
-                    'papaya' => 'mamão',
-                    'mango' => 'manga',
-                    'lemon' => 'limão',
-                    'pear' => 'pera',
-                    'rice' => 'arroz',
-                    'beans' => 'feijão',
-                    'pasta' => 'macarrão',
-                    'bread' => 'pão',
-                    'meat' => 'carne',
-                    'chicken' => 'frango',
-                    'fish' => 'peixe',
-                    'egg' => 'ovo',
-                    'milk' => 'leite',
+                    'leaves' => 'folhas',
+                    'sheets' => 'folhas',
+                    'pastry' => 'massa',
+                    'dough' => 'massa',
+                    'noodles' => 'massa',
+                    'crackers' => 'biscoitos',
+                    'gelatin' => 'gelatina',
+                    'bean' => 'feijão',
+                    'curd' => 'coalhada',
+                    'fresh' => 'fresco',
+                    'cooked' => 'cozido',
+                    'ready' => 'pronto',
+                    'oven' => 'forno',
+                    'cream' => 'creme',
                     'cheese' => 'queijo',
-                    'yogurt' => 'iogurte',
-                    'oats' => 'aveia',
-                    'almond' => 'amêndoa',
-                    'nut' => 'castanha',
-                    'broccoli' => 'brócolis',
-                    'carrot' => 'cenoura',
-                    'lettuce' => 'alface',
-                    'tomato' => 'tomate',
-                    'potato' => 'batata',
-                    'onion' => 'cebola',
-                    'garlic' => 'alho',
-                    'sugar' => 'açúcar',
-                    'salt' => 'sal',
+                    'sauce' => 'molho',
+                    'powder' => 'pó',
+                    'extract' => 'extrato',
                     'oil' => 'óleo',
                     'butter' => 'manteiga',
-                    'carbohydrates' => 'carboidratos',
-                    'protein' => 'proteínas',
-                    'fat' => 'gorduras',
-                    'calories' => 'calorias',
-                    'fiber' => 'fibras',
-                    'vitamins' => 'vitaminas',
-                    'minerals' => 'minerais',
-                    'sodium' => 'sódio',
-                    'cholesterol' => 'colesterol',
-                    'water' => 'água',
-                    'coffee' => 'café',
-                    'tea' => 'chá',
-                    'honey' => 'mel',
-                    'chocolate' => 'chocolate',
-                    'cake' => 'bolo',
-                    'pizza' => 'pizza',
-                    'hamburger' => 'hambúrguer',
-                    'ice cream' => 'sorvete',
-                    'cookie' => 'biscoito',
-                    'savory' => 'salgado',
-                    'sweet' => 'doce',
-                    'sour' => 'azedo',
-                    'bitter' => 'amargo',
-                    'salty' => 'salgado',
-                    'leaves' => 'folhas',
-                    'chips' => 'chips',
-                    'bread' => 'pão',
-                    'pepper' => 'pimenta',
-                    'squash' => 'abóbora',
-                    'blossoms' => 'flores',
-                    'rings' => 'anéis',
-                    'liqueur' => 'licor',
-                    'extract' => 'extrato',
-                    'juice' => 'suco',
-                    'sauce' => 'molho',
-                    'peas' => 'ervilhas',
-                    'corn' => 'milho',
-                    'chop' => 'costeleta',
-                    'loin' => 'lombo',
-                    'steak' => 'bife',
-                    'sausage' => 'linguiça',
-                    'bacon' => 'bacon',
-                    'cream' => 'creme',
                     'milk' => 'leite',
-                    'flour' => 'farinha',
-                    'yeast' => 'fermento',
-                    'grain' => 'grão',
-                    'butter' => 'manteiga',
-                    'seeds' => 'sementes',
-                    'kale' => 'couve',
-                    'spinach' => 'espinafre',
-                    'olive oil' => 'azeite',
-                    'syrup' => 'xarope',
-                    'vanilla' => 'baunilha',
-                    'cocoa' => 'cacau'
+                    'water' => 'água',
+                    'juice' => 'suco',
+                    'tea' => 'chá'
+                ],
+                
+                // PT -> EN  
+                'pt-en' => [
+                    'folhas' => 'leaves',
+                    'massa' => 'dough',
+                    'biscoitos' => 'crackers',
+                    'gelatina' => 'gelatin',
+                    'queijo' => 'cheese',
+                    'molho' => 'sauce',
+                    'óleo' => 'oil',
+                    'manteiga' => 'butter',
+                    'leite' => 'milk'
                 ]
             ];
 
             $chave = $de . '-' . $para;
             
-            if (isset($mapaCompleto[$chave][$texto])) {
-                return $mapaCompleto[$chave][$texto];
+            if (isset($mapaBasico[$chave][$texto])) {
+                return $mapaBasico[$chave][$texto];
             }
 
-            // Se não encontrou no mapa, retorna o texto original
             return $texto;
         }
 
-        // Busca alimentos traduzidos com tradução real
+        // Busca alimentos traduzidos com tradução contextual
         public function buscarAlimentosTraduzidos(string $termoPortugues) {
             if (empty($termoPortugues)) {
                 throw new Exception('Termo de busca não informado');
@@ -528,10 +509,10 @@
 
             $resultados = [];
             foreach ($data['results'] as $item) {
-                $nomeIngles = mb_strtolower($item['name']);
+                $nomeIngles = $item['name'];
                 
-                // Traduz o nome para português usando API real
-                $nomePortugues = $this->traduzirParaPortugues($nomeIngles);
+                // Traduz o nome para português usando tradução contextual inteligente
+                $nomePortugues = $this->traduzirParaPortugues(mb_strtolower($nomeIngles));
 
                 $resultados[] = [
                     'id' => $item['id'],
