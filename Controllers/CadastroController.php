@@ -368,6 +368,31 @@
             return preg_match('/^[A-Za-z]{1}$/', trim($categoria)) === 1;
         }
 
+        public function verificarRg($data) {
+            if (!isset($data['rg'])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'RG não fornecido']);
+                return;
+            }
+        
+            $rg = preg_replace('/[^0-9A-Za-z]/', '', $data['rg']); // limpa caracteres
+            $disponivel = !$this->rgExiste($rg);
+        
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'disponivel' => $disponivel,
+                'rg' => $rg
+            ]);
+        }
+        
+        // Função privada pra checar se o RG já existe
+        private function rgExiste($rg) {
+            $stmt = $this->db->prepare("SELECT rg FROM alunos WHERE rg = ? UNION SELECT rg FROM personal WHERE rg = ?");
+            $stmt->execute([$rg, $rg]);
+            return $stmt->fetch() !== false;
+        }
+
         // Validação da regional CREF (2-5 letras)
         private function validarCREFRegional($regional) {
             $regional = trim($regional);
