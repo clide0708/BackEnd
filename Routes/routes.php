@@ -1,4 +1,5 @@
 <?php
+
     // Incluir jwt.config.php uma vez
     require_once __DIR__ . '/../Config/jwt.config.php';
 
@@ -96,181 +97,117 @@
             'controller' => 'ExerciciosController',
             'method' => 'buscarExercicioComVideos'
         ],
-        // Exemplo de chamada exercícios normais: GET /exercicios/exercicioComVideos/normal/1
-        // Exemplo de chamada exercícios adaptados: GET /exercicios/exercicioComVideos/adaptado/2
 
-        // Rotas para TreinosController
+        // =============================
+        // ROTAS PARA TREINOS CONTROLLER 
+        // =============================
+
+        // Criar treino (básico)
         'treinos/criar' => [
             'controller' => 'TreinosController',
             'method' => 'criarTreino'
         ],
-        // Exemplo de chamada:
-        // POST /treinos/criar
-        // {
-        //     "nome": "Treino de Peito",
-        //     "tipo": "Musculação",
-        //     "criadoPor": "personal@example.com",
-        //     "idAluno": 1,
-        //     "idPersonal": 1,
-        //     "descricao": "Treino focado em peitoral",
-        //     "exercicios": [
-        //         {
-        //             "idExercicio": 1,
-        //             "series": 3,
-        //             "repeticoes": 12,
-        //             "carga": 40.5,
-        //             "ordem": 1,
-        //             "observacoes": "Fazer com controle"
-        //         },
-        //         {
-        //             "idExercAdaptado": 2,
-        //             "series": 4,
-        //             "repeticoes": 10,
-        //             "carga": 0,
-        //             "ordem": 2,
-        //             "observacoes": "Adaptado para lesão"
-        //         }
-        //     ]
-        // }
 
+        // Atualizar treino (nome, tipo, descrição)
         'treinos/atualizar/(\d+)' => [
             'controller' => 'TreinosController',
             'method' => 'atualizarTreino'
         ],
-        // Exemplo de chamada: PUT /treinos/atualizar/123
-        // Corpo:  {
-        //             "nome": "Treino de Peito Atualizado",
-        //             "tipo": "Musculação",
-        //             "descricao": "Treino revisado",
-        //             "exercicios": [
-        //                 {
-        //                     "idExercicio": 1,
-        //                     "series": 4,
-        //                     "repeticoes": 10,
-        //                     "carga": 45.0,
-        //                     "ordem": 1,
-        //                     "observacoes": "Aumentar carga"
-        //                 }
-        //             ]
-        //         }
-        
-        'treinos/buscarExercicios' => [
-            'controller' => 'TreinosController',
-            'method' => 'buscarExercicios'
-        ],
-        // Exemplo de chamada: POST /treinos/buscarExercicios
-        // Corpo: {
-        //              "nome": "supino",
-        //              "grupoMuscular": "peitoral"
-        //         }
 
-        // Rota para listar treinos do usuário autenticado
-        'treinos/listarUsuario' => [
+        // Adicionar exercício ao treino
+        'treinos/(\d+)/adicionar-exercicio' => [
             'controller' => 'TreinosController',
-            'method' => 'listarTreinosUsuario'
+            'method' => 'adicionarExercicioAoTreino'
         ],
-        // Exemplo de chamada: 
-        // POST /treinos/listarUsuario
-        // Corpo: {
-        //              "tipo": "aluno",
-        //              "id": 1,
-        //              "email": "aluno@example.com"
-        //         }
 
-        
-        'treinos/atribuirAluno' => [
+        // Listar treinos do aluno
+        'treinos/aluno/(\d+)' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarTreinosAluno'
+        ],
+
+        // Listar treinos do personal
+        'treinos/personal/(\d+)' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarTreinosPersonal'
+        ],
+
+        // Atribuir treino a aluno
+        'treinos/atribuir' => [
             'controller' => 'TreinosController',
             'method' => 'atribuirTreinoAluno'
         ],
-        // Exemplo de chamada:
-        // POST /treinos/atribuirAluno
-        // {
-        //     "idTreino": 123,
-        //     "idAluno": 2
-        // }
 
+        // Excluir treino
         'treinos/excluir/(\d+)' => [
             'controller' => 'TreinosController',
             'method' => 'excluirTreino'
         ],
-        // Exemplo de chamada:
-        // DELETE /treinos/excluir/123
-        // {
-        //     "tipo": "personal",
-        //     "id": 1,
-        //     "email": "personal@example.com"
-        // }
 
-        // Rota para buscar treino completo com exercícios e vídeos
+        // Listar alunos do personal
+        'treinos/personal/(\d+)/alunos' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarAlunosDoPersonal'
+        ],
+
+        // Listar treinos atribuídos a um aluno específico
+        'treinos/personal/(\d+)/aluno/(\d+)' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarTreinosDoAlunoAtribuidos'
+        ],
+
+        // Atualizar treino atribuído
+        'treinos/atribuido/(\d+)/atualizar' => [
+            'controller' => 'TreinosController',
+            'method' => 'atualizarTreinoAtribuido'
+        ],
+
+        // Desatribuir treino do aluno
+        'treinos/atribuido/(\d+)/desatribuir' => [
+            'controller' => 'TreinosController',
+            'method' => 'desatribuirTreinoDoAluno'
+        ],
+
+        // Desvincular aluno do personal
+        'treinos/personal/(\d+)/desvincular-aluno/(\d+)' => [
+            'controller' => 'TreinosController',
+            'method' => 'desvincularAluno'
+        ],
+
+        // Listar meus treinos (personal)
+        'treinos/personal/(\d+)/meus-treinos' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarMeusTreinosPersonal'
+        ],
+
+        // Buscar exercícios para treino
+        'treinos/buscarExercicios' => [
+            'controller' => 'TreinosController',
+            'method' => 'buscarExercicios'
+        ],
+
+        // Listar treinos do usuário autenticado
+        'treinos/listarUsuario' => [
+            'controller' => 'TreinosController',
+            'method' => 'listarTreinosUsuario'
+        ],
+
+        // Buscar treino completo com exercícios e vídeos
         'treinos/buscarCompleto/(\d+)' => [
             'controller' => 'TreinosController',
             'method' => 'buscarTreinoCompleto'
         ],
-        // Exemplo de chamada: GET /treinos/buscarCompleto/123
-
-
-
-
-
 
         // Rotas para Alimentos
         'alimentos/buscar' => [
             'controller' => 'AlimentosController',
             'method' => 'buscarAlimentos'
         ],
-        //Exemplo de chamada: GET http://localhost/BackEnd/alimentos/buscar?nome=banana
-        // Retorna lista de alimentos com tradução PT-BR:
-        //         {
-        //     "success": true,
-        //     "resultados": [
-        //         {
-        //             "id": 9003,
-        //             "nome": "banana",
-        //             "nome_original": "apple banana",
-        //             "imagem": "https://spoonacular.com/cdn/ingredients_100x100/apple-banana.png"
-        //         }
-        //     ]
-        // }
 
-        // Informação detalhada do alimento é buscada em outra rota (ver abaixo)
-
-         // Rota para buscar informação nutricional detalhada de um alimento por ID Spoonacular
-        
         'alimentos/informacao' => [
             'controller' => 'AlimentosController',
             'method' => 'buscarInformacaoAlimento'
         ],
-        // Exemplo de chamada: GET http://localhost/api/alimentos/informacao?id=9003&quantidade=100&unidade=g
-        // Retorna:
-        // {
-        //     "success": true,
-        //     "alimento": {
-        //         "id": 9003,
-        //         "nome": "banana",
-        //         "nome_original": "apple banana",
-        //         "categoria": "fruit",
-        //         "imagem": "https://spoonacular.com/cdn/ingredients_250x250/apple-banana.png",
-        //         "nutrientes": [
-        //             {
-        //                 "nome": "calorias",
-        //                 "nome_original": "calories",
-        //                 "quantidade": 89,
-        //                 "unidade": "kcal",
-        //                 "percentual_diario": 4.45
-        //             },
-        //             {
-        //                 "nome": "proteínas",
-        //                 "nome_original": "protein",
-        //                 "quantidade": 1.1,
-        //                 "unidade": "g",
-        //                 "percentual_diario": 2.2
-        //             }
-        //         ],
-        //         "quantidade_consulta": 100,
-        //         "unidade_consulta": "g"
-        //     }
-        // }
-
 
         'alimentos/testar-traducao' => [
             'controller' => 'AlimentosController',
@@ -297,41 +234,18 @@
             'method' => 'listarTotais'
         ],
 
-
-
         // Rota para testar conexão
         'config/testarConexao' => [
             'controller' => 'ConfigController',
             'method' => 'testarConexaoDB'
         ],
 
-        // Rotas para ConvitesController (exigem autenticação, exceto getConvite para o link público)
-
-        // Como Usar (Exemplos de Chamadas)
-        // Criar Convite (Personal logado):
-
-        // POST /convites/criar
-        // Body: {"email": "aluno@example.com"} ou {"idAluno": 1}
-        // Resposta: {"success": true, "link": "https://sua-api.com/convites/abc123..."}
-        // Acessar Link (Aluno):
-
-        // GET /convites/abc123...
-        // Resposta: {"success": true, "data": {"nomePersonal": "João", "nomeAluno": "Maria", ...}}
-        // Frontend: Mostra "João quer ser seu Personal. Aceitar? Negar?"
-        // Aceitar:
-
-        // POST /convites/abc123.../aceitar
-        // Resposta: {"success": true, "message": "Convite aceito!"}
-        // Negar:
-
-        // POST /convites/abc123.../negar
-        // Resposta: {"success": true, "message": "Convite negado."}
-
+        // Rotas para ConvitesController
         'convites/criar' => [
             'controller' => 'ConvitesController',
             'method' => 'criarConvite'
         ],
-        'convites/([a-zA-Z0-9]{64})' => [  // Captura token de 64 chars (bin2hex(random_bytes(32)))
+        'convites/([a-zA-Z0-9]{64})' => [
             'controller' => 'ConvitesController',
             'method' => 'getConvite'
         ],
@@ -349,24 +263,10 @@
             'controller' => 'RecuperacaoSenhaController',
             'method' => 'esqueciSenha'
         ],
-        // Exemplo de chamada:
-        // POST /recuperacao-senha/esqueci-senha
-        // {
-        //     "email": example.@gmail.com"
-        // }
-
         'recuperacao-senha/resetar-senha' => [
             'controller' => 'RecuperacaoSenhaController',
             'method' => 'resetarSenha'
-        ],
-
-        // Exemplo de chamada:
-        // POST /recuperacao-senha/resetar-senha
-        // {
-        //     "email": example.@gmail.com",
-        //     "codigo": "123456",
-        //     "novaSenha": "novaSenha123"
-        // }
+        ]
     ];
 
     // Mapeamento de controladores
@@ -418,14 +318,8 @@
             'alimentos/buscar',
             'alimentos/informacao',
             'alimentos/testar-traducao',
-            // 'alimentos/listar', // Manter protegida, só usuários autenticados podem ver alimentos salvos
-            // 'alimentos/totais', // Manter protegida, só usuários autenticados
-            // 'alimentos/adicionar', // Manter protegida, só usuários autenticados
-            // 'alimentos/remover', // Manter protegida, só usuários autenticados
-            // 'alimentos/atualizar', // Manter protegida, só usuários autenticados
 
             // Rota pública para acessar convite
-            // O convite em si é protegido por token único no link
             'convites/([a-zA-Z0-9]{64})',
         ];
         // Se a rota não for pública, exige autenticação
@@ -560,4 +454,5 @@
             echo json_encode(["error" => "Rota '$clean_path' não encontrada"]);
         }
     }
+
 ?>
