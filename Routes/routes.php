@@ -15,6 +15,14 @@
             'controller' => 'CadastroController',
             'method' => 'cadastrarPersonal'
         ],
+        'cadastro/academia' => [
+            'controller' => 'CadastroController',
+            'method' => 'cadastrarAcademia'
+        ],
+        'cadastro/dev' => [
+            'controller' => 'CadastroController',
+            'method' => 'cadastrarDev'
+        ],
         'cadastro/verificar-email' => [
             'controller' => 'CadastroController',
             'method' => 'verificarEmail'
@@ -26,6 +34,10 @@
         'cadastro/verificar-rg' => [
             'controller' => 'CadastroController',
             'method' => 'verificarRg'
+        ],
+        'cadastro/verificar-cnpj' => [
+            'controller' => 'CadastroController',
+            'method' => 'verificarCnpj'
         ],
 
         // Rotas para Autenticação
@@ -207,60 +219,10 @@
             'controller' => 'AlimentosController',
             'method' => 'buscarAlimentos'
         ],
-        //Exemplo de chamada: GET http://localhost/BackEnd/alimentos/buscar?nome=banana
-        // Retorna lista de alimentos com tradução PT-BR:
-        //         {
-        //     "success": true,
-        //     "resultados": [
-        //         {
-        //             "id": 9003,
-        //             "nome": "banana",
-        //             "nome_original": "apple banana",
-        //             "imagem": "https://spoonacular.com/cdn/ingredients_100x100/apple-banana.png"
-        //         }
-        //     ]
-        // }
-
-        // Informação detalhada do alimento é buscada em outra rota (ver abaixo)
-
-        // Rota para buscar informação nutricional detalhada de um alimento por ID Spoonacular
-
         'alimentos/informacao' => [
             'controller' => 'AlimentosController',
             'method' => 'buscarInformacaoAlimento'
         ],
-        // Exemplo de chamada: GET http://localhost/api/alimentos/informacao?id=9003&quantidade=100&unidade=g
-        // Retorna:
-        // {
-        //     "success": true,
-        //     "alimento": {
-        //         "id": 9003,
-        //         "nome": "banana",
-        //         "nome_original": "apple banana",
-        //         "categoria": "fruit",
-        //         "imagem": "https://spoonacular.com/cdn/ingredients_250x250/apple-banana.png",
-        //         "nutrientes": [
-        //             {
-        //                 "nome": "calorias",
-        //                 "nome_original": "calories",
-        //                 "quantidade": 89,
-        //                 "unidade": "kcal",
-        //                 "percentual_diario": 4.45
-        //             },
-        //             {
-        //                 "nome": "proteínas",
-        //                 "nome_original": "protein",
-        //                 "quantidade": 1.1,
-        //                 "unidade": "g",
-        //                 "percentual_diario": 2.2
-        //             }
-        //         ],
-        //         "quantidade_consulta": 100,
-        //         "unidade_consulta": "g"
-        //     }
-        // }
-
-
         'alimentos/testar-traducao' => [
             'controller' => 'AlimentosController',
             'method' => 'testarTraducao'
@@ -286,36 +248,13 @@
             'method' => 'listarTotais'
         ],
 
-
-
         // Rota para testar conexão
         'config/testarConexao' => [
             'controller' => 'ConfigController',
             'method' => 'testarConexaoDB'
         ],
 
-        // Rotas para ConvitesController (exigem autenticação, exceto getConvite para o link público)
-
-        // Como Usar (Exemplos de Chamadas)
-        // Criar Convite (Personal logado):
-
-        // POST /convites/criar
-        // Body: {"email": "aluno@example.com"} ou {"idAluno": 1}
-        // Resposta: {"success": true, "link": "https://sua-api.com/convites/abc123..."}
-        // Acessar Link (Aluno):
-
-        // GET /convites/abc123...
-        // Resposta: {"success": true, "data": {"nomePersonal": "João", "nomeAluno": "Maria", ...}}
-        // Frontend: Mostra "João quer ser seu Personal. Aceitar? Negar?"
-        // Aceitar:
-
-        // POST /convites/abc123.../aceitar
-        // Resposta: {"success": true, "message": "Convite aceito!"}
-        // Negar:
-
-        // POST /convites/abc123.../negar
-        // Resposta: {"success": true, "message": "Convite negado."}
-
+        // Rotas para ConvitesController
         'convites/criar' => [
             'controller' => 'ConvitesController',
             'method' => 'criarConvite'
@@ -338,24 +277,10 @@
             'controller' => 'RecuperacaoSenhaController',
             'method' => 'esqueciSenha'
         ],
-        // Exemplo de chamada:
-        // POST /recuperacao-senha/esqueci-senha
-        // {
-        //     "email": example.@gmail.com"
-        // }
-
         'recuperacao-senha/resetar-senha' => [
             'controller' => 'RecuperacaoSenhaController',
             'method' => 'resetarSenha'
         ],
-
-        // Exemplo de chamada:
-        // POST /recuperacao-senha/resetar-senha
-        // {
-        //     "email": example.@gmail.com",
-        //     "codigo": "123456",
-        //     "novaSenha": "novaSenha123"
-        // }
 
         // Rotas para Perfil
         'perfil/aluno/(\d+)' => [
@@ -382,13 +307,85 @@
             'controller' => 'PerfilController',
             'method' => 'putPerfilPersonal'
         ],
+        'perfil/academia/(\d+)' => [
+            'controller' => 'PerfilController',
+            'method' => 'getPerfilAcademia'
+        ],
+        'perfil/academia' => [
+            'controller' => 'PerfilController',
+            'method' => 'postPerfilAcademia'
+        ],
+        'perfil/academia/(\d+)' => [
+            'controller' => 'PerfilController',
+            'method' => 'putPerfilAcademia'
+        ],
+        'perfil/dev/(\d+)' => [
+            'controller' => 'PerfilController',
+            'method' => 'getPerfilDev'
+        ],
+        'perfil/dev' => [
+            'controller' => 'PerfilController',
+            'method' => 'putPerfilDev'
+        ],
         'perfil/personal/(\d+)/alunos' => [
             'controller' => 'PerfilController',
-            'method' => 'getAlunosVinculados'
+            'method' => 'getAlunosDoPersonal'
         ],
         'perfil/personal/(\d+)/treinos-criados' => [
             'controller' => 'PerfilController',
             'method' => 'getTreinosCriadosPorPersonal'
+        ],
+        'perfil/plano' => [
+            'controller' => 'PerfilController',
+            'method' => 'getPlanoUsuario'
+        ],
+        'perfil/plano/trocar' => [
+            'controller' => 'PerfilController',
+            'method' => 'trocarPlano'
+        ],
+        'perfil/plano/cancelar' => [
+            'controller' => 'PerfilController',
+            'method' => 'cancelarPlano'
+        ],
+        'perfil/excluir-conta' => [
+            'controller' => 'PerfilController',
+            'method' => 'excluirConta'
+        ],
+
+        // Rotas para Planos
+        'planos' => [
+            'controller' => 'PlanosController',
+            'method' => 'getAllPlanos'
+        ],
+        'planos/(\d+)' => [
+            'controller' => 'PlanosController',
+            'method' => 'getPlanoById'
+        ],
+        'planos/criar' => [
+            'controller' => 'PlanosController',
+            'method' => 'createPlano'
+        ],
+        'planos/atualizar/(\d+)' => [
+            'controller' => 'PlanosController',
+            'method' => 'updatePlano'
+        ],
+        'planos/deletar/(\d+)' => [
+            'controller' => 'PlanosController',
+            'method' => 'deletePlano'
+        ],
+
+        // Rotas para Pagamentos
+        'pagamentos/iniciar' => [
+            'controller' => 'PagamentosController',
+            'method' => 'iniciarPagamento'
+        ],
+        'pagamentos/confirmar' => [
+            'controller' => 'PagamentosController',
+            'method' => 'confirmarPagamento'
+        ],
+        'pagamentos/historico' => [
+            'controller' => 'PagamentosController',
+            'method' => 'getHistoricoPagamentos'
         ],
     ];
 
@@ -403,6 +400,8 @@
         'ConvitesController' => __DIR__ . '/../Controllers/ConvitesController.php',
         'RecuperacaoSenhaController' => __DIR__ . '/../Controllers/RecuperacaoSenhaController.php',
         'PerfilController' => __DIR__ . '/../Controllers/PerfilController.php',
+        'PlanosController' => __DIR__ . '/../Controllers/PlanosController.php',
+        'PagamentosController' => __DIR__ . '/../Controllers/PagamentosController.php',
     ];
 
     // Função para despachar a requisição
@@ -433,9 +432,12 @@
             'auth/verificar-autenticacao',
             'cadastro/aluno',
             'cadastro/personal',
+            'cadastro/academia',
+            'cadastro/dev',
             'cadastro/verificar-email',
             'cadastro/verificar-cpf',
             'cadastro/verificar-rg',
+            'cadastro/verificar-cnpj',
             'config/testarConexao',
             'recuperacao-senha/esqueci-senha',
             'recuperacao-senha/resetar-senha',
@@ -445,8 +447,13 @@
             'convites/([a-zA-Z0-9]{64})',
             'perfil/aluno/(\d+)',
             'perfil/personal/(\d+)',
+            'perfil/academia/(\d+)',
+            'perfil/dev/(\d+)',
             'perfil/aluno',
             'perfil/personal',
+            'perfil/academia',
+            'planos',
+            'planos/(\d+)',
         ];
         
         // Se a rota não for pública, exige autenticação
@@ -495,11 +502,6 @@
                                             $params[] = $query_params['id'];
                                         }
                                         break;
-                                    case 'buscarPorNome':
-                                        if (isset($query_params['nome'])) {
-                                            $params[] = $query_params['nome'];
-                                        }
-                                        break;
                                     case 'deletarExercicio':
                                         if (isset($query_params['id'])) {
                                             $params[] = $query_params['id'];
@@ -513,6 +515,11 @@
                                     case 'verificarCpf':
                                         if (isset($query_params['cpf'])) {
                                             $params[] = ['cpf' => $query_params['cpf']];
+                                        }
+                                        break;
+                                    case 'verificarCnpj':
+                                        if (isset($query_params['cnpj'])) {
+                                            $params[] = ['cnpj' => $query_params['cnpj']];
                                         }
                                         break;
                                 }

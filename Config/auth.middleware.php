@@ -1,5 +1,4 @@
 <?php
-
     require_once __DIR__ . '/../Config/jwt.config.php';
 
     function autenticar() {
@@ -17,9 +16,9 @@
             exit;
         }
 
-        // salva os dados do usuário no $_SERVER
-        // aqui não precisa do ->data, só usa o objeto decodificado
+        // Salva os dados do usuário decodificados no $_SERVER para acesso posterior nos controllers
+        // O objeto decodificado já contém 'sub' (ID do usuário) e 'tipo' (tipo de usuário)
         $_SERVER['user'] = (array) $decoded;
     }
-    
+
 ?>
