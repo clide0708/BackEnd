@@ -241,37 +241,77 @@ class TreinosController
         }
     }
 
+    public function listarTreinosAlunoComPersonal($idAluno)
+    {
+        header('Content-Type: application/json');
 
-    // Listar treinos para personal
+        // Obter usuário do token JWT
+        // $usuario = $this->obterUsuarioDoToken();
+        // if (!$usuario || $usuario['sub'] != $idAluno || $usuario['tipo'] !== 'aluno') {
+        //     http_response_code(403);
+        //     echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
+        //     return;
+        // }
+
+        try {
+            $stmt = $this->db->prepare("
+            SELECT t.*, p.nome AS nomePersonal
+            FROM treinos t
+            LEFT JOIN personal p ON t.idPersonal = p.idPersonal
+            WHERE t.idAluno = ? AND t.idPersonal IS NOT NULL
+            ORDER BY t.data_ultima_modificacao DESC
+        ");
+            $stmt->execute([$idAluno]);
+            $treinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'treinosAtribuidos' => $treinos
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+
+
     public function listarTreinosPersonal($idPersonal)
     {
+        header('Content-Type: application/json');
+
+        // Obter usuário do token JWT
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $idPersonalToken != $idPersonal) {
+        if (!$usuario || $usuario['sub'] != $idPersonal || $usuario['tipo'] !== 'personal') {
             http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Você não tem permissão']);
+            echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
             return;
         }
 
         try {
             $stmt = $this->db->prepare("
-            SELECT t.*, a.nome as nomeAluno
+            SELECT t.*, a.nome AS nomeAluno
             FROM treinos t
             LEFT JOIN alunos a ON t.idAluno = a.idAluno
-            WHERE t.idPersonal = ?
+            WHERE t.idPersonal = ? AND t.idAluno IS NOT NULL
             ORDER BY t.data_ultima_modificacao DESC
         ");
             $stmt->execute([$idPersonal]);
             $treinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            http_response_code(200);
             echo json_encode([
                 'success' => true,
                 'treinosAtribuidos' => $treinos
             ]);
-        } catch (Exception $e) {
+        } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Erro ao listar treinos: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
+
+
 
 
     // Atribuir treino a aluno (atualizar idAluno)
