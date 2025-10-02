@@ -1,5 +1,6 @@
 <?php
-    require_once __DIR__ . '/../Config/db.connect.php'; // Caminho corrigido
+
+    require_once __DIR__ . '/../Config/db.connect.php';
 
     class ExerciciosController {
         private $db;
@@ -227,4 +228,5 @@
             }
         }
     }
+
 ?>
