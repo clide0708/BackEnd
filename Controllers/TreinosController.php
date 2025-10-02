@@ -153,7 +153,7 @@ class TreinosController
         if (!is_null($treino['idAluno']) && $usuario['idAluno'] == $treino['idAluno'] && $usuario['email'] == $treino['criadoPor']) {
             $usuarioValido = true;
         }
-        if (!is_null($treino['idPersonal']) && $usuario['idPersonal'] == $treino['idPersonal'] && $usuario['email'] == $treino['criadoPor']) {
+        if (!is_null($treino['idPersonal']) && $idPersonalToken == $treino['idPersonal'] && $usuario['email'] == $treino['criadoPor']) {
             $usuarioValido = true;
         }
 
@@ -246,7 +246,7 @@ class TreinosController
     public function listarTreinosPersonal($idPersonal)
     {
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idPersonal'] != $idPersonal) {
+        if (!$usuario || $idPersonalToken != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão']);
             return;
@@ -277,6 +277,7 @@ class TreinosController
     // Atribuir treino a aluno (atualizar idAluno)
     public function atribuirTreinoAluno($data)
     {
+
         $idTreino = (int)($data['idTreino'] ?? 0);
         $idAluno = (int)($data['idAluno'] ?? 0);
 
@@ -287,33 +288,38 @@ class TreinosController
         }
 
         // Obter usuário do token JWT
-        $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || !isset($usuario['idPersonal'])) {
+        $token = extrairTokenHeader();
+        $usuario = $token ? obterDadosUsuario($token) : null;
+        if (!$usuario || $usuario['tipo'] !== 'personal') {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Apenas personais podem atribuir treinos']);
             return;
         }
+        $idPersonalToken = $usuario['sub']; // pega idPersonal do token
+
+        $idPersonalToken = $usuario['sub']; // pega idPersonal do token
 
         // Verificar se treino existe e pertence ao personal
-        $stmt = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
-        $stmt->execute([$idTreino]);
-        $treino = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmtAluno = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ?");
+        $stmtAluno->execute([$idAluno]);
+        $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
 
-        if (!$treino) {
+        if (!$aluno) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Treino não encontrado']);
+            echo json_encode(['success' => false, 'error' => 'Aluno não encontrado']);
             return;
         }
 
-        if ($treino['idPersonal'] != $usuario['idPersonal'] || $usuario['email'] != $treino['criadoPor']) {
+        // agora verifica se o idPersonal do token bate com o idPersonal do aluno
+        if ($aluno['idPersonal'] != $idPersonalToken) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Você não tem permissão para atribuir este treino']);
+            echo json_encode(['success' => false, 'error' => 'Aluno não vinculado a você']);
             return;
         }
 
         // Verificar se aluno existe e está vinculado ao personal
         $stmtAluno = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ? AND idPersonal = ?");
-        $stmtAluno->execute([$idAluno, $usuario['idPersonal']]);
+        $stmtAluno->execute([$idAluno, $idPersonalToken]);
         $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
 
         if (!$aluno) {
@@ -334,6 +340,7 @@ class TreinosController
             echo json_encode(['success' => false, 'error' => 'Erro ao atribuir treino: ' . $e->getMessage()]);
         }
     }
+
 
     // Excluir treino
     public function excluirTreino($idTreino)
@@ -426,7 +433,7 @@ class TreinosController
 
         // Verificar permissão
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idPersonal'] != $idPersonal) {
+        if (!$usuario || $idPersonalToken != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes alunos']);
             return;
@@ -453,7 +460,7 @@ class TreinosController
 
         // Verificar permissão
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idPersonal'] != $idPersonal) {
+        if (!$usuario || $idPersonalToken != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
             return;
@@ -490,7 +497,7 @@ class TreinosController
 
         // Obter usuário do token JWT
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || !isset($usuario['idPersonal'])) {
+        if (!$usuario || !isset($idPersonalToken)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Apenas personais podem atualizar treinos atribuídos']);
             return;
@@ -507,7 +514,7 @@ class TreinosController
             return;
         }
 
-        if ($treino['idPersonal'] != $usuario['idPersonal'] || $usuario['email'] != $treino['criadoPor']) {
+        if ($treino['idPersonal'] != $idPersonalToken || $usuario['email'] != $treino['criadoPor']) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para editar este treino']);
             return;
@@ -545,7 +552,7 @@ class TreinosController
 
         // Obter usuário do token JWT
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || !isset($usuario['idPersonal'])) {
+        if (!$usuario || !isset($idPersonalToken)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Apenas personais podem desatribuir treinos']);
             return;
@@ -562,7 +569,7 @@ class TreinosController
             return;
         }
 
-        if ($treino['idPersonal'] != $usuario['idPersonal'] || $usuario['email'] != $treino['criadoPor']) {
+        if ($treino['idPersonal'] != $idPersonalToken || $usuario['email'] != $treino['criadoPor']) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para desatribuir este treino']);
             return;
@@ -589,7 +596,7 @@ class TreinosController
 
         // Verificar se o usuário é o personal que quer desvincular
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idPersonal'] != $idPersonal) {
+        if (!$usuario || $idPersonalToken != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para desvincular este aluno']);
             return;
@@ -621,7 +628,7 @@ class TreinosController
 
         // Verificar permissão
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idPersonal'] != $idPersonal) {
+        if (!$usuario || $idPersonalToken != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
             return;
