@@ -26,7 +26,6 @@ class CadastroController
         try {
             // Validação dos campos obrigatórios
             $camposObrigatorios = ['nome', 'cpf', 'rg', 'email', 'senha', 'numTel'];
-
             foreach ($camposObrigatorios as $campo) {
                 if (!isset($data[$campo]) || empty(trim($data[$campo]))) {
                     http_response_code(400);
@@ -41,33 +40,28 @@ class CadastroController
                 echo json_encode(['success' => false, 'error' => 'Email inválido']);
                 return;
             }
-
             if (!$this->validarCPF($data['cpf'])) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'CPF inválido']);
                 return;
             }
-
             if (!$this->validarTelefone($data['numTel'])) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'Telefone inválido']);
                 return;
             }
-
             if (strlen($data['senha']) < 6) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'Senha deve ter pelo menos 6 caracteres']);
                 return;
             }
 
-            // Verifica se email já existe
+            // Verifica duplicidade
             if ($this->emailExiste($data['email'])) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'Email já cadastrado']);
                 return;
             }
-
-            // Verifica se CPF já existe
             if ($this->cpfExiste($data['cpf'])) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => 'CPF já cadastrado']);
@@ -76,23 +70,16 @@ class CadastroController
 
             // Hash da senha
             $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
-
-            // Formatar CPF e telefone
             $cpfFormatado = $this->formatarCPF($data['cpf']);
             $telefoneFormatado = $this->formatarTelefone($data['numTel']);
 
-            // Buscar ID do plano 'Aluno Básico'
-            $idPlanoBasico = $this->buscarPlanoId('Aluno Básico', 'aluno');
-            if (!$idPlanoBasico) {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Plano padrão para aluno não encontrado.']);
-                return;
-            }
+            // plano padrão (id 1) – mas pode buscar por nome se quiser
+            $idPlanoBasico = 1;
 
             $stmt = $this->db->prepare("
-                    INSERT INTO alunos (nome, cpf, rg, email, senha, numTel, data_cadastro, idPlano, status_conta) 
-                    VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, 'Ativa')
-                ");
+                INSERT INTO alunos (nome, cpf, rg, email, senha, numTel, data_cadastro, idPlano, status_conta) 
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, 'Ativa')
+            ");
 
             $success = $stmt->execute([
                 trim($data['nome']),
@@ -106,9 +93,6 @@ class CadastroController
 
             if ($success) {
                 $alunoId = $this->db->lastInsertId();
-                // Criar assinatura para o plano básico
-                $this->criarAssinatura($alunoId, 'aluno', $idPlanoBasico, 'ativa');
-
                 $aluno = $this->buscarAlunoPorId($alunoId);
 
                 http_response_code(201);
@@ -116,7 +100,7 @@ class CadastroController
                     'success' => true,
                     'idAluno' => $alunoId,
                     'aluno' => $aluno,
-                    'message' => 'Aluno cadastrado com sucesso e plano básico atribuído.'
+                    'message' => 'Aluno cadastrado com sucesso no plano básico.'
                 ]);
             } else {
                 http_response_code(400);
@@ -391,6 +375,7 @@ class CadastroController
         $stmt->execute([$id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+
 
     // Método para buscar personal por ID
     private function buscarPersonalPorId($id)
