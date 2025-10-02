@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../Config/db.connect.php';
+require_once __DIR__ . '/../Config/jwt.config.php';
+
 
 class TreinosController
 {
@@ -8,8 +10,9 @@ class TreinosController
 
     public function __construct()
     {
-        $this->db = connectDB();
+        $this->db = connectDB(); // chama a função que tu definiu no final do DB.php
     }
+
 
     // Criar treino - obrigatório: nome, tipo, criadoPor, idAluno ou idPersonal
     public function criarTreino($data)
@@ -194,25 +197,32 @@ class TreinosController
     }
 
     // Listar treinos para aluno
-    public function listarTreinosAluno($idAluno)
+    public function listarTreinosAluno($idAluno = null)
     {
-        $idAluno = (int)$idAluno;
-
-        // Verificar se o usuário tem permissão para ver estes treinos
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $usuario['idAluno'] != $idAluno) {
+        if (!$usuario) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Token inválido ou expirado']);
+            return;
+        }
+
+        // se não passou idAluno, pega do token
+        $idAluno = $idAluno ?? ($usuario['idAluno'] ?? null);
+
+        // se ainda não tiver idAluno ou o usuário não é dono do treino, bloqueia
+        if (!$idAluno) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
             return;
         }
 
         try {
-            // Treinos criados pelo próprio aluno (idPersonal IS NULL)
+            // treinos do próprio aluno
             $stmt1 = $this->db->prepare("SELECT * FROM treinos WHERE idAluno = ? AND idPersonal IS NULL ORDER BY data_ultima_modificacao DESC");
             $stmt1->execute([$idAluno]);
             $meusTreinos = $stmt1->fetchAll(PDO::FETCH_ASSOC);
 
-            // Treinos criados pelo personal conectado (idPersonal IS NOT NULL)
+            // treinos criados pelo personal
             $stmt2 = $this->db->prepare("SELECT t.*, p.nome as nomePersonal FROM treinos t LEFT JOIN personal p ON t.idPersonal = p.idPersonal WHERE t.idAluno = ? AND t.idPersonal IS NOT NULL ORDER BY t.data_ultima_modificacao DESC");
             $stmt2->execute([$idAluno]);
             $treinosPersonal = $stmt2->fetchAll(PDO::FETCH_ASSOC);
@@ -228,6 +238,7 @@ class TreinosController
             echo json_encode(['success' => false, 'error' => 'Erro ao listar treinos: ' . $e->getMessage()]);
         }
     }
+
 
     // Listar treinos para personal
     public function listarTreinosPersonal($idPersonal)
@@ -759,8 +770,8 @@ class TreinosController
             require_once __DIR__ . '/../Config/jwt.config.php';
 
             try {
-                $decoded = JWT::decode($token, $key, array('HS256'));
-                return (array)$decoded->data;
+                $decoded = decodificarToken($token); // usar sua função que já retorna payload
+                return $decoded ? (array)$decoded : null;
             } catch (Exception $e) {
                 return null;
             }
