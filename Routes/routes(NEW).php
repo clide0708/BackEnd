@@ -158,24 +158,6 @@ $routes = [
         'method' => 'listarTreinosAlunoComPersonal'
     ],
 
-    // Listar exercícios de um treino
-    'treinos/(\d+)/exercicios' => [
-        'controller' => 'TreinosController',
-        'method' => 'listarExerciciosDoTreino'
-    ],
-
-    // Atualizar exercício no treino
-    'treinos/exercicio/(\d+)/atualizar' => [
-        'controller' => 'TreinosController',
-        'method' => 'atualizarExercicioNoTreino'
-    ],
-
-    // Remover exercício do treino
-    'treinos/exercicio/(\d+)/remover' => [
-        'controller' => 'TreinosController',
-        'method' => 'removerExercicioDoTreino'
-    ],
-
     // Atribuir treino a aluno
     'treinos/atribuir' => [
         'controller' => 'TreinosController',
