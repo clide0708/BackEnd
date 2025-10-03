@@ -275,8 +275,6 @@ class TreinosController
         }
     }
 
-
-
     public function listarTreinosPersonal($idPersonal)
     {
         header('Content-Type: application/json');
@@ -294,7 +292,7 @@ class TreinosController
             SELECT t.*, a.nome AS nomeAluno
             FROM treinos t
             LEFT JOIN alunos a ON t.idAluno = a.idAluno
-            WHERE t.idPersonal = ? AND t.idAluno IS NOT NULL
+            WHERE t.idPersonal = ?  -- pega todos os treinos do personal, com ou sem aluno
             ORDER BY t.data_ultima_modificacao DESC
         ");
             $stmt->execute([$idPersonal]);
@@ -303,14 +301,13 @@ class TreinosController
             http_response_code(200);
             echo json_encode([
                 'success' => true,
-                'treinosAtribuidos' => $treinos
+                'meusTreinos' => $treinos
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
-
 
 
 
