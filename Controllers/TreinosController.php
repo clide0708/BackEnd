@@ -131,11 +131,10 @@ class TreinosController
 
         // Obter usuário do token JWT
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario) {
-            http_response_code(401);
-            echo json_encode(['success' => false, 'error' => 'Token inválido ou expirado']);
-            return;
-        }
+        $idAlunoToken = $usuario['tipo'] === 'aluno' ? $usuario['sub'] : null;
+        $idPersonalToken = $usuario['tipo'] === 'personal' ? $usuario['sub'] : null;
+        $emailUsuario = strtolower(trim($usuario['email']));
+
 
         // Verificar se treino existe e pertence ao usuário (aluno ou personal)
         $stmt = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
@@ -150,10 +149,10 @@ class TreinosController
 
         // Verificar permissão: o usuário deve ser o criador (idAluno ou idPersonal) e email deve bater com criadoPor
         $usuarioValido = false;
-        if (!is_null($treino['idAluno']) && $usuario['idAluno'] == $treino['idAluno'] && $usuario['email'] == $treino['criadoPor']) {
+        if (!is_null($treino['idAluno']) && $idAlunoToken == $treino['idAluno'] && $emailUsuario == $treino['criadoPor']) {
             $usuarioValido = true;
         }
-        if (!is_null($treino['idPersonal']) && $idPersonalToken == $treino['idPersonal'] && $usuario['email'] == $treino['criadoPor']) {
+        if (!is_null($treino['idPersonal']) && $idPersonalToken == $treino['idPersonal'] && $emailUsuario == $treino['criadoPor']) {
             $usuarioValido = true;
         }
 
@@ -195,6 +194,168 @@ class TreinosController
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erro ao adicionar exercício: ' . $e->getMessage()]);
+        }
+    }
+
+    public function listarExerciciosDoTreino($idTreino)
+    {
+        $idTreino = (int)$idTreino;
+
+        // Obter usuário do token JWT
+        $usuario = $this->obterUsuarioDoToken();
+        if (!$usuario) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Token inválido ou expirado']);
+            return;
+        }
+
+        try {
+            $stmt = $this->db->prepare("
+                    SELECT te.*,
+                        e.nome as nomeExercicio,
+                        e.grupoMuscular as grupoMuscularExercicio,
+                        e.descricao as descricaoExercicio,
+                        ea.nome as nomeExercAdaptado,
+                        ea.grupoMuscular as grupoMuscularExercAdaptado,
+                        ea.descricao as descricaoExercAdaptado,
+                        v.url as video_url
+                    FROM treino_exercicio te
+                    LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio
+                    LEFT JOIN exercadaptados ea ON te.idExercAdaptado = ea.idExercAdaptado
+                    LEFT JOIN videos v ON (te.idExercicio = v.idExercicio OR te.idExercAdaptado = v.idExercAdaptado)
+                    WHERE te.idTreino = ?
+                    ORDER BY te.ordem
+                ");
+            $stmt->execute([$idTreino]);
+            $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            http_response_code(200);
+            echo json_encode(['success' => true, 'exercicios' => $exercicios]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erro ao listar exercícios: ' . $e->getMessage()]);
+        }
+    }
+
+    // Atualizar exercício no treino
+    public function atualizarExercicioNoTreino($idTreinoExercicio, $data)
+    {
+        $idTreinoExercicio = (int)$idTreinoExercicio;
+        $usuario = $this->obterUsuarioDoToken();
+        if (!$usuario) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Token inválido']);
+            return;
+        }
+
+        $idAlunoToken = $usuario['tipo'] === 'aluno' ? $usuario['sub'] : null;
+        $idPersonalToken = $usuario['tipo'] === 'personal' ? $usuario['sub'] : null;
+        $emailUsuario = strtolower(trim($usuario['email']));
+
+        $stmt = $this->db->prepare("SELECT te.*, t.idAluno, t.idPersonal, t.criadoPor FROM treino_exercicio te INNER JOIN treinos t ON te.idTreino = t.idTreino WHERE te.idTreino_Exercicio = ?");
+        $stmt->execute([$idTreinoExercicio]);
+        $exercicio = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$exercicio) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Exercício no treino não encontrado']);
+            return;
+        }
+
+        $usuarioValido = false;
+        if (!is_null($exercicio['idAluno']) && $idAlunoToken == $exercicio['idAluno'] && $emailUsuario == strtolower(trim($exercicio['criadoPor']))) {
+            $usuarioValido = true;
+        }
+        if (!is_null($exercicio['idPersonal']) && $idPersonalToken == $exercicio['idPersonal'] && $emailUsuario == strtolower(trim($exercicio['criadoPor']))) {
+            $usuarioValido = true;
+        }
+
+        if (!$usuarioValido) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Você não tem permissão para editar este exercício']);
+            return;
+        }
+
+        $series = $data['series'] ?? $exercicio['series'];
+        $repeticoes = $data['repeticoes'] ?? $exercicio['repeticoes'];
+        $carga = $data['carga'] ?? $exercicio['carga'];
+        $ordem = $data['ordem'] ?? $exercicio['ordem'];
+        $observacoes = $data['observacoes'] ?? $exercicio['observacoes'];
+
+        try {
+            $now = date('Y-m-d H:i:s');
+            $stmt = $this->db->prepare("UPDATE treino_exercicio SET series = ?, repeticoes = ?, carga = ?, ordem = ?, observacoes = ?, data_ultima_modificacao = ? WHERE idTreino_Exercicio = ?");
+            $stmt->execute([$series, $repeticoes, $carga, $ordem, $observacoes, $now, $idTreinoExercicio]);
+
+            $stmtUpdateTreino = $this->db->prepare("UPDATE treinos SET data_ultima_modificacao = ? WHERE idTreino = ?");
+            $stmtUpdateTreino->execute([$now, $exercicio['idTreino']]);
+
+            http_response_code(200);
+            echo json_encode(['success' => true, 'message' => 'Exercício atualizado com sucesso']);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erro ao atualizar exercício: ' . $e->getMessage()]);
+        }
+    }
+
+
+    // Remover exercício do treino
+    public function removerExercicioDoTreino($idTreinoExercicio)
+    {
+        $idTreinoExercicio = (int)$idTreinoExercicio;
+
+        // Obter usuário do token JWT
+        $usuario = $this->obterUsuarioDoToken();
+        $idAlunoToken = $usuario['tipo'] === 'aluno' ? $usuario['sub'] : null;
+        $idPersonalToken = $usuario['tipo'] === 'personal' ? $usuario['sub'] : null;
+        $emailUsuario = strtolower(trim($usuario['email']));
+
+
+        try {
+            // Verificar se o exercício pertence a um treino do usuário
+            $stmt = $this->db->prepare("
+                    SELECT t.* 
+                    FROM treino_exercicio te 
+                    JOIN treinos t ON te.idTreino = t.idTreino 
+                    WHERE te.idTreino_Exercicio = ?
+                ");
+            $stmt->execute([$idTreinoExercicio]);
+            $treinoExercicio = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$treinoExercicio) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Exercício não encontrado no treino']);
+                return;
+            }
+
+            // Verificar permissão
+            $usuarioValido = false;
+            if (!is_null($treinoExercicio['idAluno']) && $idAlunoToken == $treinoExercicio['idAluno'] && $emailUsuario == $treinoExercicio['criadoPor']) {
+                $usuarioValido = true;
+            }
+            if (!is_null($treinoExercicio['idPersonal']) && $idPersonalToken == $treinoExercicio['idPersonal'] && $emailUsuario == $treinoExercicio['criadoPor']) {
+                $usuarioValido = true;
+            }
+
+            if (!$usuarioValido) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Você não tem permissão para remover este exercício']);
+                return;
+            }
+
+            // Remover exercício
+            $stmt = $this->db->prepare("DELETE FROM treino_exercicio WHERE idTreino_Exercicio = ?");
+            $stmt->execute([$idTreinoExercicio]);
+
+            // Atualizar data_ultima_modificacao do treino
+            $stmtUpdate = $this->db->prepare("UPDATE treinos SET data_ultima_modificacao = ? WHERE idTreino = ?");
+            $stmtUpdate->execute([date('Y-m-d H:i:s'), $treinoExercicio['idTreino']]);
+
+            http_response_code(200);
+            echo json_encode(['success' => true, 'message' => 'Exercício removido do treino com sucesso']);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erro ao remover exercício: ' . $e->getMessage()]);
         }
     }
 
