@@ -1,7 +1,7 @@
 <?php
 
     namespace App\Repositories;
-
+    
     use PDO;
     use App\Config\Database;
 
@@ -10,9 +10,7 @@
 
         public function __construct() {
             // Certifique-se de que a conexão com o banco de dados está sendo estabelecida corretamente
-            require_once __DIR__ . 
-    '/../Config/db.connect.php'
-    ;
+            require_once __DIR__ . '/../Config/db.connect.php';
             $this->conn = DB::connectDB();
         }
 
