@@ -48,7 +48,7 @@ class AuthController
                     'cpf' => $usuario['cpf'],
                     'rg' => $usuario['rg'] ?? null,
                     'email' => $usuario['email'],
-                    'statusPlano' => $usuario['statusPlano'],
+                    'status_conta' => $usuario['status_conta'],
                     'numTel' => $usuario['numTel'],
                     'data_cadastro' => $usuario['data_cadastro']
                 ];
