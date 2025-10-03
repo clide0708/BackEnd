@@ -212,6 +212,23 @@ $routes = [
         'method' => 'buscarExercicios'
     ],
 
+    'treinos/(\d+)/exercicios' => [
+        'controller' => 'TreinosController',
+        'method' => 'listarExerciciosDoTreino'
+    ],
+
+    // Atualizar exercício no treino
+    'treinos/exercicio/(\d+)/atualizar' => [
+        'controller' => 'TreinosController',
+        'method' => 'atualizarExercicioNoTreino'
+    ],
+
+    // Remover exercício do treino
+    'treinos/exercicio/(\d+)/remover' => [
+        'controller' => 'TreinosController',
+        'method' => 'removerExercicioDoTreino'
+    ],
+
     // Listar treinos do usuário autenticado
     'treinos/listarUsuario' => [
         'controller' => 'TreinosController',
