@@ -72,7 +72,7 @@
                 // MUDANÇA: Use NOW() diretamente no SQL para data_cadastro (data atual do BD)
                 $stmt = $this->db->prepare("
                     INSERT INTO alunos (nome, cpf, rg, email, senha, numTel, data_cadastro, status_conta) 
-                    VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Pendente')
+                    VALUES (?, ?, ?, ?, ?, ?, NOW(), 'Ativa')
                 ");
 
                 // MUDANÇA: Execute com 6 parâmetros (sem data_cadastro)
@@ -209,7 +209,7 @@
                 $stmt = $this->db->prepare("
                     INSERT INTO personal 
                     (nome, cpf, rg, cref_numero, cref_categoria, cref_regional, email, senha, numTel, data_cadastro, status_conta) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'Pendente')
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'Ativa')
                 ");
 
                 // MUDANÇA: Execute com 9 parâmetros (sem data_cadastro)
