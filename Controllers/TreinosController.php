@@ -750,11 +750,13 @@ class TreinosController
 
         // Obter usuário do token JWT
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || !isset($idPersonalToken)) {
+        if (!$usuario || $usuario['tipo'] !== 'personal') {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Apenas personais podem desatribuir treinos']);
             return;
         }
+
+        $idPersonalToken = $usuario['sub'];
 
         // Verificar se treino existe e pertence ao personal
         $stmt = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
@@ -767,7 +769,7 @@ class TreinosController
             return;
         }
 
-        if ($treino['idPersonal'] != $idPersonalToken || $usuario['email'] != $treino['criadoPor']) {
+        if ($treino['idPersonal'] != $idPersonalToken) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para desatribuir este treino']);
             return;
