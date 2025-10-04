@@ -2,17 +2,14 @@
 require_once __DIR__ . '/../Config/db.connect.php';
 require_once __DIR__ . '/../Config/jwt.config.php';
 
-class AuthController
-{
+class AuthController {
     private $db;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->db = DB::connectDB();
     }
 
-    public function login($data)
-    {
+    public function login($data) {
         try {
             if (!isset($data['email']) || !isset($data['senha'])) {
                 http_response_code(400);
@@ -24,52 +21,150 @@ class AuthController
             $senha = $data['senha'];
             $lembrar = isset($data['lembrar']) && $data['lembrar'] === true;
 
-            // busca aluno
-            $stmt = $this->db->prepare("SELECT * FROM alunos WHERE email = ?");
-            $stmt->execute([$email]);
-            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-            $tipo = 'aluno';
+            $usuario = null;
+            $tipo = null;
 
-            // se não encontrou, busca personal
+            // Busca em alunos
+            $stmt = $this->db->prepare("SELECT * FROM alunos WHERE email = ? AND status_conta = 'Ativa'");
+            $stmt->execute([$email]);
+            if ($foundUser = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $usuario = $foundUser;
+                $tipo = 'aluno';
+            }
+
+            // Se não encontrou, busca em personal
             if (!$usuario) {
-                $stmt = $this->db->prepare("SELECT * FROM personal WHERE email = ?");
+                $stmt = $this->db->prepare("SELECT * FROM personal WHERE email = ? AND status_conta = 'Ativa'");
                 $stmt->execute([$email]);
-                $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-                $tipo = 'personal';
+                if ($foundUser = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $usuario = $foundUser;
+                    $tipo = 'personal';
+                }
+            }
+
+            // Se não encontrou, busca em academias
+            if (!$usuario) {
+                $stmt = $this->db->prepare("SELECT * FROM academias WHERE email = ? AND status_conta = 'Ativa'");
+                $stmt->execute([$email]);
+                if ($foundUser = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $usuario = $foundUser;
+                    $tipo = 'academia';
+                }
+            }
+
+            // Se não encontrou, busca em devs
+            if (!$usuario) {
+                $stmt = $this->db->prepare("SELECT * FROM devs WHERE email = ?");
+                $stmt->execute([$email]);
+                if ($foundUser = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $usuario = $foundUser;
+                    $tipo = 'dev';
+                }
             }
 
             if ($usuario && password_verify($senha, $usuario['senha'])) {
                 session_start();
 
-                $userData = [
-                    'id' => $tipo === 'aluno' ? $usuario['idAluno'] : $usuario['idPersonal'],
-                    'tipo' => $tipo,
-                    'nome' => $usuario['nome'],
-                    'cpf' => $usuario['cpf'],
-                    'rg' => $usuario['rg'] ?? null,
-                    'email' => $usuario['email'],
-                    'status_conta' => $usuario['status_conta'],
-                    'numTel' => $usuario['numTel'],
-                    'data_cadastro' => $usuario['data_cadastro']
-                ];
+                $userData = [];
+                $payload = [];
 
-                if ($tipo === 'personal') {
-                    $userData['cref_numero'] = $usuario['cref_numero'];
-                    $userData['cref_categoria'] = $usuario['cref_categoria'];
-                    $userData['cref_regional'] = $usuario['cref_regional'];
+                // Construir userData e payload com base no tipo de usuário
+                switch ($tipo) {
+                    case 'aluno':
+                        $userData = [
+                            'id' => $usuario['idAluno'],
+                            'tipo' => $tipo,
+                            'nome' => $usuario['nome'],
+                            'cpf' => $usuario['cpf'],
+                            'rg' => $usuario['rg'] ?? null,
+                            'email' => $usuario['email'],
+                            'numTel' => $usuario['numTel'],
+                            'data_cadastro' => $usuario['data_cadastro'],
+                            'idPlano' => $usuario['idPlano'],
+                            'status_conta' => $usuario['status_conta']
+                        ];
+                        $payload = [
+                            'sub' => $userData['id'],
+                            'tipo' => $tipo,
+                            'nome' => $userData['nome'],
+                            'email' => $userData['email'],
+                            'idPlano' => $userData['idPlano']
+                        ];
+                        break;
+                    case 'personal':
+                        $userData = [
+                            'id' => $usuario['idPersonal'],
+                            'tipo' => $tipo,
+                            'nome' => $usuario['nome'],
+                            'cpf' => $usuario['cpf'],
+                            'rg' => $usuario['rg'] ?? null,
+                            'cref_numero' => $usuario['cref_numero'],
+                            'cref_categoria' => $usuario['cref_categoria'],
+                            'cref_regional' => $usuario['cref_regional'],
+                            'email' => $usuario['email'],
+                            'numTel' => $usuario['numTel'],
+                            'data_cadastro' => $usuario['data_cadastro'],
+                            'idPlano' => $usuario['idPlano'],
+                            'status_conta' => $usuario['status_conta']
+                        ];
+                        $payload = [
+                            'sub' => $userData['id'],
+                            'tipo' => $tipo,
+                            'nome' => $userData['nome'],
+                            'email' => $userData['email'],
+                            'cref_numero' => $userData['cref_numero'],
+                            'idPlano' => $userData['idPlano']
+                        ];
+                        break;
+                    case 'academia':
+                        $userData = [
+                            'id' => $usuario['idAcademia'],
+                            'tipo' => $tipo,
+                            'nome' => $usuario['nome'],
+                            'cnpj' => $usuario['cnpj'],
+                            'email' => $usuario['email'],
+                            'telefone' => $usuario['telefone'] ?? null,
+                            'endereco' => $usuario['endereco'] ?? null,
+                            'data_cadastro' => $usuario['data_cadastro'],
+                            'idPlano' => $usuario['idPlano'],
+                            'status_conta' => $usuario['status_conta']
+                        ];
+                        $payload = [
+                            'sub' => $userData['id'],
+                            'tipo' => $tipo,
+                            'nome' => $userData['nome'],
+                            'email' => $userData['email'],
+                            'cnpj' => $userData['cnpj'],
+                            'idPlano' => $userData['idPlano']
+                        ];
+                        break;
+                    case 'dev':
+                        $userData = [
+                            'id' => $usuario['idDev'],
+                            'tipo' => $tipo,
+                            'nome' => $usuario['nome'],
+                            'email' => $usuario['email'],
+                            'data_cadastro' => $usuario['data_cadastro'],
+                            'nivel_acesso' => $usuario['nivel_acesso']
+                        ];
+                        $payload = [
+                            'sub' => $userData['id'],
+                            'tipo' => $tipo,
+                            'nome' => $userData['nome'],
+                            'email' => $userData['email'],
+                            'nivel_acesso' => $userData['nivel_acesso']
+                        ];
+                        break;
+                    default:
+                        http_response_code(401);
+                        echo json_encode(['success' => false, 'error' => 'Tipo de usuário desconhecido']);
+                        return;
                 }
 
                 $_SESSION['usuario'] = $userData;
 
-                $payload = [
-                    'sub' => $userData['id'],
-                    'tipo' => $tipo,
-                    'nome' => $userData['nome'],
-                    'email' => $userData['email']
-                ];
-
-                $expira = $lembrar ? null : time() + (2 * 60 * 60);
-                $token = criarToken($payload, $expira);
+                // Passa o parâmetro $lembrar para a função criarToken
+                $token = criarToken($payload, $lembrar);
 
                 http_response_code(200);
                 echo json_encode([
@@ -81,7 +176,7 @@ class AuthController
                 ]);
             } else {
                 http_response_code(401);
-                echo json_encode(['success' => false, 'error' => 'Email ou senha incorretos']);
+                echo json_encode(['success' => false, 'error' => 'Email ou senha incorretos ou conta inativa']);
             }
         } catch (PDOException $e) {
             http_response_code(500);
@@ -89,8 +184,7 @@ class AuthController
         }
     }
 
-    public function logout()
-    {
+    public function logout() {
         session_start();
         session_unset();
         session_destroy();
@@ -99,10 +193,8 @@ class AuthController
         echo json_encode(['success' => true, 'message' => 'Logout realizado com sucesso']);
     }
 
-    public function verificarToken()
-    {
+    public function verificarToken() {
         try {
-            // sempre pega o token do header
             $token = extrairTokenHeader();
 
             if (!$token) {
@@ -130,8 +222,7 @@ class AuthController
         }
     }
 
-    public function obterUsuarioToken()
-    {
+    public function obterUsuarioToken() {
         try {
             $token = extrairTokenHeader();
             if (!$token) {
@@ -158,8 +249,7 @@ class AuthController
         }
     }
 
-    public function verificarAutenticacao()
-    {
+    public function verificarAutenticacao() {
         try {
             $token = extrairTokenHeader();
 
@@ -176,3 +266,4 @@ class AuthController
         }
     }
 }
+?>
