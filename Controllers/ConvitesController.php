@@ -119,65 +119,82 @@ class ConvitesController
      * Acessa o convite via link (Aluno visualiza).
      * Retorna detalhes para o frontend mostrar opções aceitar/negar.
      */
-    public function getConvite($token)
+    public function getConvites($emailAluno)
     {
         header('Content-Type: application/json');
         try {
-            // Busca convite por token (pendente)
+            // busca todos os convites pendentes pelo email do aluno
             $stmt = $this->db->prepare("
-                    SELECT c.idConvite, c.status, c.data_criacao,
-                        p.nome AS nomePersonal, p.email AS emailPersonal,
-                        a.nome AS nomeAluno, a.email AS emailAluno, a.idAluno, p.idPersonal
-                    FROM convites c
-                    JOIN personal p ON c.idPersonal = p.idPersonal
-                    LEFT JOIN alunos a ON c.idAluno = a.idAluno
-                    WHERE c.token = ? AND c.status = 'pendente'
-                ");
-            $stmt->execute([$token]);
-            $convite = $stmt->fetch(PDO::FETCH_ASSOC);
+            SELECT 
+                c.idConvite,
+                c.status,
+                c.data_criacao,
+                p.nome AS nomePersonal,
+                p.email AS emailPersonal,
+                a.nome AS nomeAluno,
+                a.email AS emailAluno,
+                a.idAluno,
+                p.idPersonal
+            FROM convites c
+            JOIN personal p ON c.idPersonal = p.idPersonal
+            LEFT JOIN alunos a ON c.idAluno = a.idAluno
+            WHERE a.email = ? AND c.status = 'pendente'
+            ORDER BY c.data_criacao DESC
+        ");
+            $stmt->execute([$emailAluno]);
+            $convites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!$convite) {
+            if (empty($convites)) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Convite não encontrado ou já respondido.']);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Nenhum convite pendente encontrado para este aluno.'
+                ]);
                 return;
             }
 
             http_response_code(200);
             echo json_encode([
                 'success' => true,
-                'message' => 'Convite encontrado.',
-                'data' => $convite
+                'message' => 'Convites encontrados.',
+                'data' => $convites
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro no banco: ' . $e->getMessage()
+            ]);
         }
     }
+
 
     /**
      * Aceita o convite (Aluno aceita).
      * Associa aluno ao personal.
      */
-    public function aceitarConvite($token)
+    public function aceitarConvite($idConvite)
     {
         header('Content-Type: application/json');
-        // Verifica se quem está aceitando o convite é um aluno
+
         if (!isset($_SERVER['user']) || $_SERVER['user']['tipo'] !== 'aluno') {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas Alunos podem aceitar convites.']);
             return;
         }
+
         $idAlunoLogado = $_SERVER['user']['sub'];
 
         try {
-            // Busca e trava o convite (para evitar race conditions)
             $this->db->beginTransaction();
+
+            // busca e trava o convite
             $stmt = $this->db->prepare("
-                    SELECT idAluno, idPersonal FROM convites 
-                    WHERE token = ? AND status = 'pendente'
-                    FOR UPDATE
-                ");
-            $stmt->execute([$token]);
+            SELECT idAluno, idPersonal FROM convites 
+            WHERE idConvite = ? AND status = 'pendente'
+            FOR UPDATE
+        ");
+            $stmt->execute([$idConvite]);
             $convite = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$convite) {
@@ -187,7 +204,6 @@ class ConvitesController
                 return;
             }
 
-            // Verifica se o aluno logado é o aluno do convite
             if ($convite['idAluno'] != $idAlunoLogado) {
                 $this->db->rollBack();
                 http_response_code(403);
@@ -198,11 +214,9 @@ class ConvitesController
             $idAluno = $convite['idAluno'];
             $idPersonal = $convite['idPersonal'];
 
-            // Atualiza status do convite
-            $stmt = $this->db->prepare("UPDATE convites SET status = 'aceito' WHERE token = ?");
-            $stmt->execute([$token]);
+            $stmt = $this->db->prepare("UPDATE convites SET status = 'aceito' WHERE idConvite = ?");
+            $stmt->execute([$idConvite]);
 
-            // Associa aluno ao personal e atualiza status de vínculo
             $stmt = $this->db->prepare("UPDATE alunos SET idPersonal = ?, status_vinculo = 'Ativo' WHERE idAluno = ?");
             $stmt->execute([$idPersonal, $idAluno]);
 
@@ -220,27 +234,21 @@ class ConvitesController
         }
     }
 
-    /**
-     * Nega o convite (Aluno nega).
-     */
-    public function negarConvite($token)
+    public function negarConvite($idConvite)
     {
         header('Content-Type: application/json');
-        // Verifica se quem está negando o convite é um aluno
+
         if (!isset($_SERVER['user']) || $_SERVER['user']['tipo'] !== 'aluno') {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas Alunos podem negar convites.']);
             return;
         }
+
         $idAlunoLogado = $_SERVER['user']['sub'];
 
         try {
-            // Busca convite
-            $stmt = $this->db->prepare("
-                    SELECT idAluno FROM convites 
-                    WHERE token = ? AND status = 'pendente'
-                ");
-            $stmt->execute([$token]);
+            $stmt = $this->db->prepare("SELECT idAluno FROM convites WHERE idConvite = ? AND status = 'pendente'");
+            $stmt->execute([$idConvite]);
             $convite = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$convite) {
@@ -249,16 +257,14 @@ class ConvitesController
                 return;
             }
 
-            // Verifica se o aluno logado é o aluno do convite
             if ($convite['idAluno'] != $idAlunoLogado) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'error' => 'Você não tem permissão para negar este convite.']);
                 return;
             }
 
-            // Atualiza status
-            $stmt = $this->db->prepare("UPDATE convites SET status = 'negado' WHERE token = ?");
-            $stmt->execute([$token]);
+            $stmt = $this->db->prepare("UPDATE convites SET status = 'negado' WHERE idConvite = ?");
+            $stmt->execute([$idConvite]);
 
             http_response_code(200);
             echo json_encode([
