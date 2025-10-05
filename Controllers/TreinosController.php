@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/../Config/db.connect.php';
 require_once __DIR__ . '/../Config/jwt.config.php';
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 
 
 class TreinosController
@@ -453,7 +456,7 @@ class TreinosController
             SELECT t.*, a.nome AS nomeAluno
             FROM treinos t
             LEFT JOIN alunos a ON t.idAluno = a.idAluno
-            WHERE t.idPersonal = ?  -- pega todos os treinos do personal, com ou sem aluno
+            WHERE t.idPersonal = ? AND t.idAluno IS NULL
             ORDER BY t.data_ultima_modificacao DESC
         ");
             $stmt->execute([$idPersonal]);
@@ -471,8 +474,6 @@ class TreinosController
     }
 
 
-
-    // Atribuir treino a aluno (atualizar idAluno)
     public function atribuirTreinoAluno($data)
     {
         $idTreino = (int)($data['idTreino'] ?? 0);
@@ -516,27 +517,51 @@ class TreinosController
         }
 
         try {
-            // remove campos que não queremos duplicar exatamente
-            unset($treinoOriginal['idTreino']); // id autoincrement
+            $this->db->beginTransaction();
+
+            // duplica treino
+            unset($treinoOriginal['idTreino']);
             $treinoOriginal['idAluno'] = $idAluno;
             $treinoOriginal['data_ultima_modificacao'] = date('Y-m-d H:i:s');
 
-            // gera placeholders pro insert
             $campos = array_keys($treinoOriginal);
             $placeholders = array_map(fn($c) => '?', $campos);
 
-            $stmtInsert = $this->db->prepare("INSERT INTO treinos (" . implode(',', $campos) . ") VALUES (" . implode(',', $placeholders) . ")");
+            $stmtInsert = $this->db->prepare(
+                "INSERT INTO treinos (" . implode(',', $campos) . ") VALUES (" . implode(',', $placeholders) . ")"
+            );
             $stmtInsert->execute(array_values($treinoOriginal));
+            $novoIdTreino = $this->db->lastInsertId();
+
+            // duplica exercícios do treino
+            $stmtEx = $this->db->prepare("SELECT * FROM treino_exercicio WHERE idTreino = ?");
+            $stmtEx->execute([$idTreino]);
+            $exercicios = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmtInsertEx = $this->db->prepare(
+                "INSERT INTO treino_exercicio (idTreino, idExercicio, series, repeticoes, carga) VALUES (?, ?, ?, ?, ?)"
+            );
+
+            foreach ($exercicios as $ex) {
+                $stmtInsertEx->execute([
+                    $novoIdTreino,
+                    $ex['idExercicio'],
+                    $ex['series'],
+                    $ex['repeticoes'],
+                    $ex['carga']
+                ]);
+            }
+
+            $this->db->commit();
 
             http_response_code(200);
-            echo json_encode(['success' => true, 'message' => 'Treino duplicado e atribuído ao aluno com sucesso']);
+            echo json_encode(['success' => true, 'message' => 'Treino e exercícios duplicados e atribuídos ao aluno com sucesso']);
         } catch (Exception $e) {
+            $this->db->rollBack();
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erro ao duplicar treino: ' . $e->getMessage()]);
         }
     }
-
-
 
     // Excluir treino
     public function excluirTreino($idTreino)
