@@ -475,7 +475,6 @@ class TreinosController
     // Atribuir treino a aluno (atualizar idAluno)
     public function atribuirTreinoAluno($data)
     {
-
         $idTreino = (int)($data['idTreino'] ?? 0);
         $idAluno = (int)($data['idAluno'] ?? 0);
 
@@ -485,7 +484,6 @@ class TreinosController
             return;
         }
 
-        // Obter usuário do token JWT
         $token = extrairTokenHeader();
         $usuario = $token ? obterDadosUsuario($token) : null;
         if (!$usuario || $usuario['tipo'] !== 'personal') {
@@ -493,29 +491,9 @@ class TreinosController
             echo json_encode(['success' => false, 'error' => 'Apenas personais podem atribuir treinos']);
             return;
         }
-        $idPersonalToken = $usuario['sub']; // pega idPersonal do token
+        $idPersonalToken = $usuario['sub'];
 
-        $idPersonalToken = $usuario['sub']; // pega idPersonal do token
-
-        // Verificar se treino existe e pertence ao personal
-        $stmtAluno = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ?");
-        $stmtAluno->execute([$idAluno]);
-        $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
-
-        if (!$aluno) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Aluno não encontrado']);
-            return;
-        }
-
-        // agora verifica se o idPersonal do token bate com o idPersonal do aluno
-        if ($aluno['idPersonal'] != $idPersonalToken) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Aluno não vinculado a você']);
-            return;
-        }
-
-        // Verificar se aluno existe e está vinculado ao personal
+        // verifica aluno e vínculo
         $stmtAluno = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ? AND idPersonal = ?");
         $stmtAluno->execute([$idAluno, $idPersonalToken]);
         $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
@@ -526,18 +504,38 @@ class TreinosController
             return;
         }
 
+        // pega treino original
+        $stmtTreino = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
+        $stmtTreino->execute([$idTreino]);
+        $treinoOriginal = $stmtTreino->fetch(PDO::FETCH_ASSOC);
+
+        if (!$treinoOriginal) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Treino não encontrado']);
+            return;
+        }
+
         try {
-            $stmt = $this->db->prepare("UPDATE treinos SET idAluno = ?, data_ultima_modificacao = ? WHERE idTreino = ?");
-            $now = date('Y-m-d H:i:s');
-            $stmt->execute([$idAluno, $now, $idTreino]);
+            // remove campos que não queremos duplicar exatamente
+            unset($treinoOriginal['idTreino']); // id autoincrement
+            $treinoOriginal['idAluno'] = $idAluno;
+            $treinoOriginal['data_ultima_modificacao'] = date('Y-m-d H:i:s');
+
+            // gera placeholders pro insert
+            $campos = array_keys($treinoOriginal);
+            $placeholders = array_map(fn($c) => '?', $campos);
+
+            $stmtInsert = $this->db->prepare("INSERT INTO treinos (" . implode(',', $campos) . ") VALUES (" . implode(',', $placeholders) . ")");
+            $stmtInsert->execute(array_values($treinoOriginal));
 
             http_response_code(200);
-            echo json_encode(['success' => true, 'message' => 'Treino atribuído ao aluno com sucesso']);
+            echo json_encode(['success' => true, 'message' => 'Treino duplicado e atribuído ao aluno com sucesso']);
         } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Erro ao atribuir treino: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao duplicar treino: ' . $e->getMessage()]);
         }
     }
+
 
 
     // Excluir treino
@@ -788,33 +786,59 @@ class TreinosController
         }
     }
 
-    // Desvincular aluno do personal
+    // Desvincular aluno <-> personal e remover treinos atribuídos
+    // rota: 'personal/(\d+)/desvincular-aluno/(\d+)' 
+    // onde primeiro número é idPersonal e segundo é idAluno
+
     public function desvincularAluno($idPersonal, $idAluno)
     {
-        $idPersonal = (int)$idPersonal;
         $idAluno = (int)$idAluno;
+        $idPersonal = (int)$idPersonal;
 
-        // Verificar se o usuário é o personal que quer desvincular
+        // obter usuário do token
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $idPersonalToken != $idPersonal) {
+        if (!$usuario || $usuario['tipo'] !== 'personal' || $usuario['sub'] != $idPersonal) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Você não tem permissão para desvincular este aluno']);
+            echo json_encode(['success' => false, 'error' => 'Apenas o personal dono do aluno pode desvincular']);
             return;
         }
 
         try {
-            // Atualizar aluno removendo o idPersonal
-            $stmt = $this->db->prepare("UPDATE alunos SET idPersonal = NULL WHERE idAluno = ? AND idPersonal = ?");
-            $stmt->execute([$idAluno, $idPersonal]);
+            // verificar se aluno existe e tá vinculado ao personal
+            $stmtAluno = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ? AND idPersonal = ?");
+            $stmtAluno->execute([$idAluno, $idPersonal]);
+            $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
 
-            if ($stmt->rowCount() === 0) {
+            if (!$aluno) {
                 http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Aluno não encontrado ou não vinculado a este personal']);
+                echo json_encode(['success' => false, 'error' => 'Aluno não encontrado ou não vinculado a você']);
                 return;
             }
 
+            // pegar treinos atribuídos desse aluno pelo personal
+            $stmtTreinos = $this->db->prepare("SELECT idTreino FROM treinos WHERE idAluno = ? AND idPersonal = ?");
+            $stmtTreinos->execute([$idAluno, $idPersonal]);
+            $treinos = $stmtTreinos->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($treinos as $treino) {
+                // apagar exercícios
+                $stmtEx = $this->db->prepare("DELETE FROM treino_exercicio WHERE idTreino = ?");
+                $stmtEx->execute([$treino['idTreino']]);
+
+                // apagar treino
+                $stmtDel = $this->db->prepare("DELETE FROM treinos WHERE idTreino = ?");
+                $stmtDel->execute([$treino['idTreino']]);
+            }
+
+            // desvincular aluno do personal
+            $stmtUpd = $this->db->prepare("UPDATE alunos SET idPersonal = NULL WHERE idAluno = ?");
+            $stmtUpd->execute([$idAluno]);
+
             http_response_code(200);
-            echo json_encode(['success' => true, 'message' => 'Aluno desvinculado com sucesso']);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Aluno desvinculado e treinos atribuídos apagados com sucesso'
+            ]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erro ao desvincular aluno: ' . $e->getMessage()]);
@@ -828,7 +852,7 @@ class TreinosController
 
         // Verificar permissão
         $usuario = $this->obterUsuarioDoToken();
-        if (!$usuario || $idPersonalToken != $idPersonal) {
+        if (!$usuario || $usuario['sub'] != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
             return;

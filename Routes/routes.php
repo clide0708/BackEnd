@@ -195,7 +195,7 @@ $routes = [
     ],
 
     // Desvincular aluno do personal
-    'treinos/personal/(\d+)/desvincular-aluno/(\d+)' => [
+    'personal/(\d+)/desvincular-aluno/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'desvincularAluno'
     ],
@@ -286,15 +286,16 @@ $routes = [
         'controller' => 'ConvitesController',
         'method' => 'criarConvite'
     ],
-    'convites/([a-zA-Z0-9]{64})' => [  // Captura token de 64 chars (bin2hex(random_bytes(32)))
+    'convites/([^/]+)' => [
         'controller' => 'ConvitesController',
-        'method' => 'getConvite'
+        'method' => 'getConvites'
     ],
-    'convites/([a-zA-Z0-9]{64})/aceitar' => [
+
+    'convites/(\d+)/aceitar' => [
         'controller' => 'ConvitesController',
         'method' => 'aceitarConvite'
     ],
-    'convites/([a-zA-Z0-9]{64})/negar' => [
+    'convites/(\d+)/negar' => [
         'controller' => 'ConvitesController',
         'method' => 'negarConvite'
     ],
