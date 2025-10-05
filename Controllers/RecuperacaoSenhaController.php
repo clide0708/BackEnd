@@ -1,8 +1,8 @@
 <?php
     
     require_once __DIR__ . '/../Config/db.connect.php';
-    require_once __DIR__ . '/../vendor/autoload.php'; // PHPMailer autoload
-    require_once __DIR__ . '/../Config/jwt.config.php'; // Para carregar .env e TOKEN_SECRET
+    require_once __DIR__ . '/../vendor/autoload.php';
+    require_once __DIR__ . '/../Config/jwt.config.php';
 
     use PHPMailer\PHPMailer\PHPMailer;
     use PHPMailer\PHPMailer\Exception;
@@ -18,7 +18,6 @@
 
         /**
          * Endpoint POST /esqueci-senha
-         * Recebe { "email": "usuario@gmail.com" }
          */
         public function esqueciSenha($data) {
             header('Content-Type: application/json');
@@ -31,27 +30,19 @@
                 return;
             }
 
-            // Verifica se o email existe em algum dos usuários (aluno, personal, dev)
             $existe = $this->emailExiste($email);
 
             if (!$existe) {
-                // Resposta genérica para não expor se o email existe
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'O e-mail informado não foi encontrado :(!']);
                 return;
             }
 
-            // Gera código alfanumérico seguro de 6 caracteres
             $codigo = $this->gerarCodigo(6);
-
-            // Hash seguro do código usando hash_hmac com chave secreta
             $tokenHash = hash_hmac('sha256', $codigo, $this->tokenSecret);
-
-            // Define expiração para 15 minutos a partir de agora
             $expiresAt = (new DateTime('+15 minutes'))->format('Y-m-d H:i:s');
 
             try {
-                // Insere ou atualiza token para este email (limpa tokens antigos)
                 $this->limparTokensAntigos($email);
 
                 $stmt = $this->pdo->prepare("
@@ -60,7 +51,6 @@
                 ");
                 $stmt->execute([$email, $tokenHash, $expiresAt]);
 
-                // Envia email com o código
                 $this->enviarEmailCodigo($email, $codigo);
 
                 http_response_code(200);
@@ -76,7 +66,6 @@
 
         /**
          * Endpoint POST /resetar-senha
-         * Recebe { "email", "codigo", "nova_senha" }
          */
         public function resetarSenha($data) {
             header('Content-Type: application/json');
@@ -104,7 +93,6 @@
             }
 
             try {
-                // Busca token válido para o email
                 $stmt = $this->pdo->prepare("
                     SELECT id, token_hash, expiraEm, tentativas, usado
                     FROM recuperacao_senha 
@@ -121,17 +109,14 @@
                     return;
                 }
 
-                // Verifica tentativas
                 if ($registro['tentativas'] >= 3) {
                     http_response_code(429);
                     echo json_encode(['success' => false, 'error' => 'Número máximo de tentativas excedido. Solicite um novo código.']);
                     return;
                 }
 
-                // Verifica código (hash_hmac)
                 $codigoHash = hash_hmac('sha256', $codigo, $this->tokenSecret);
                 if (!hash_equals($registro['token_hash'], $codigoHash)) {
-                    // Incrementa tentativas
                     $stmt = $this->pdo->prepare("UPDATE recuperacao_senha SET tentativas = tentativas + 1 WHERE id = ?");
                     $stmt->execute([$registro['id']]);
 
@@ -140,7 +125,6 @@
                     return;
                 }
 
-                // Atualiza senha do usuário (aluno, personal ou dev)
                 $senhaHash = password_hash($novaSenha, PASSWORD_DEFAULT);
                 $atualizado = $this->atualizarSenhaUsuario($email, $senhaHash);
 
@@ -150,7 +134,6 @@
                     return;
                 }
 
-                // Invalida token (marca como usado)
                 $stmt = $this->pdo->prepare("UPDATE recuperacao_senha SET usado= 1 WHERE id = ?");
                 $stmt->execute([$registro['id']]);
 
@@ -164,21 +147,15 @@
 
         // --- Funções auxiliares ---
 
-        /**
-         * Verifica se o email existe em alunos, personal ou dev (exemplo)
-         */
         private function emailExiste(string $email): bool {
-            // Verifica em alunos
             $stmt = $this->pdo->prepare("SELECT 1 FROM alunos WHERE email = ? LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
 
-            // Verifica em personal
             $stmt = $this->pdo->prepare("SELECT 1 FROM personal WHERE email = ? LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
 
-            // Verifica em devs
             $stmt = $this->pdo->prepare("SELECT 1 FROM devs WHERE email = ? LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
@@ -186,9 +163,6 @@
             return false;
         }
 
-        /**
-         * Gera código alfanumérico seguro de tamanho $length
-         */
         private function gerarCodigo(int $length): string {
             $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             $codigo = '';
@@ -199,22 +173,15 @@
             return $codigo;
         }
 
-        /**
-         * Limpa tokens antigos para o email (opcional)
-         */
         private function limparTokensAntigos(string $email): void {
             $stmt = $this->pdo->prepare("DELETE FROM recuperacao_senha WHERE email = ? AND usado= 1");
             $stmt->execute([$email]);
         }
 
-        /**
-         * Envia email com o código usando PHPMailer
-         */
         private function enviarEmailCodigo(string $email, string $codigo): void {
             $mail = new PHPMailer(true);
 
             try {
-                // Configurações SMTP
                 $mail->isSMTP();
                 $mail->Host = $_ENV['SMTP_HOST'];
                 $mail->SMTPAuth = true;
@@ -239,27 +206,20 @@
 
                 $mail->send();
             } catch (Exception $e) {
-                // Logar erro, mas não interromper fluxo para não expor dados
                 error_log("Erro ao enviar email de recuperação: " . $mail->ErrorInfo);
                 throw new Exception("Não foi possível enviar o email de recuperação.");
             }
         }
 
-        /**
-         * Atualiza a senha do usuário (aluno, personal, dev)
-         */
         private function atualizarSenhaUsuario(string $email, string $senhaHash): bool {
-            // Tenta atualizar em alunos
             $stmt = $this->pdo->prepare("UPDATE alunos SET senha = ? WHERE email = ?");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;
 
-            // Tenta atualizar em personal
             $stmt = $this->pdo->prepare("UPDATE personal SET senha = ? WHERE email = ?");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;
             
-            // Tenta atualizar em devs
             $stmt = $this->pdo->prepare("UPDATE devs SET senha = ? WHERE email = ?");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;

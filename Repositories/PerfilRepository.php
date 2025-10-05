@@ -1,21 +1,23 @@
 <?php
 
     namespace App\Repositories;
-    
+
     use PDO;
     use App\Config\Database;
 
-    class PerfilRepository {
+    class PerfilRepository
+    {
         private $conn;
 
-        public function __construct() {
-            // Certifique-se de que a conexão com o banco de dados está sendo estabelecida corretamente
+        public function __construct()
+        {
             require_once __DIR__ . '/../Config/db.connect.php';
             $this->conn = DB::connectDB();
         }
 
         // Métodos GET para perfis
-        public function getAlunoById($idAluno) {
+        public function getAlunoById($idAluno)
+        {
             $query = "SELECT a.idAluno, a.nome, a.altura, a.genero, a.meta, a.foto_perfil, 
                             p.nome as personal_nome, p.email as personal_email, 
                             pl.nome as plano_nome, pl.descricao as plano_descricao, pl.valor_mensal as plano_valor
@@ -29,7 +31,8 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        public function getPersonalById($idPersonal) {
+        public function getPersonalById($idPersonal)
+        {
             $query = "SELECT p.idPersonal, p.nome, p.idade, p.genero, p.email, p.foto_perfil, 
                             pl.nome as plano_nome, pl.descricao as plano_descricao, pl.valor_mensal as plano_valor
                     FROM personal p
@@ -41,7 +44,8 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        public function getAcademiaById($idAcademia) {
+        public function getAcademiaById($idAcademia)
+        {
             $query = "SELECT ac.idAcademia, ac.nome, ac.cnpj, ac.email, ac.telefone, ac.endereco, 
                             pl.nome as plano_nome, pl.descricao as plano_descricao, pl.valor_mensal as plano_valor
                     FROM academias ac
@@ -53,7 +57,8 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        public function getDevById($idDev) {
+        public function getDevById($idDev)
+        {
             $query = "SELECT d.idDev, d.nome, d.email, d.nivel_acesso
                     FROM devs d
                     WHERE d.idDev = :idDev";
@@ -63,8 +68,9 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        // Métodos POST/PUT para perfis (completar/atualizar)
-        public function updateAlunoPerfil($idAluno, $data) {
+        // Métodos POST/PUT para perfis
+        public function updateAlunoPerfil($idAluno, $data)
+        {
             $updates = [];
             $params = [":idAluno" => $idAluno];
 
@@ -85,7 +91,8 @@
             return ["success" => $success, "message" => "Perfil do aluno atualizado com sucesso.", "rows_affected" => $stmt->rowCount()];
         }
 
-        public function updatePersonalPerfil($idPersonal, $data) {
+        public function updatePersonalPerfil($idPersonal, $data)
+        {
             $updates = [];
             $params = [":idPersonal" => $idPersonal];
 
@@ -105,7 +112,8 @@
             return ["success" => $success, "message" => "Perfil do personal atualizado com sucesso.", "rows_affected" => $stmt->rowCount()];
         }
 
-        public function updateAcademiaPerfil($idAcademia, $data) {
+        public function updateAcademiaPerfil($idAcademia, $data)
+        {
             $updates = [];
             $params = [":idAcademia" => $idAcademia];
 
@@ -124,7 +132,8 @@
             return ["success" => $success, "message" => "Perfil da academia atualizado com sucesso.", "rows_affected" => $stmt->rowCount()];
         }
 
-        public function updateDevPerfil($idDev, $data) {
+        public function updateDevPerfil($idDev, $data)
+        {
             $updates = [];
             $params = [":idDev" => $idDev];
 
@@ -143,7 +152,8 @@
         }
 
         // Métodos para gerenciamento de planos
-        public function getPlanoUsuario($idUsuario, $tipoUsuario) {
+        public function getPlanoUsuario($idUsuario, $tipoUsuario)
+        {
             $idColumn = 'id' . ucfirst($tipoUsuario);
             $query = "SELECT p.idPlano, p.nome, p.descricao, p.valor_mensal, p.tipo_usuario, p.caracteristicas, a.status as status_assinatura
                     FROM " . $tipoUsuario . "s u
@@ -158,7 +168,8 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        public function getPlanoById($idPlano) {
+        public function getPlanoById($idPlano)
+        {
             $query = "SELECT * FROM planos WHERE idPlano = :idPlano AND ativo = TRUE";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idPlano", $idPlano);
@@ -166,7 +177,8 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        public function cancelarAssinaturaAtual($idUsuario, $tipoUsuario) {
+        public function cancelarAssinaturaAtual($idUsuario, $tipoUsuario)
+        {
             $query = "UPDATE assinaturas SET status = 'cancelada', data_fim = NOW() 
                     WHERE idUsuario = :idUsuario AND tipo_usuario = :tipoUsuario AND status = 'ativa'";
             $stmt = $this->conn->prepare($query);
@@ -175,7 +187,8 @@
             return $stmt->execute();
         }
 
-        public function criarNovaAssinatura($idUsuario, $tipoUsuario, $idPlano, $status) {
+        public function criarNovaAssinatura($idUsuario, $tipoUsuario, $idPlano, $status)
+        {
             $query = "INSERT INTO assinaturas (idUsuario, tipo_usuario, idPlano, status) VALUES (:idUsuario, :tipoUsuario, :idPlano, :status)";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idUsuario", $idUsuario);
@@ -185,10 +198,11 @@
             return $stmt->execute();
         }
 
-        public function updateUsuarioPlano($idUsuario, $tipoUsuario, $idPlano) {
+        public function updateUsuarioPlano($idUsuario, $tipoUsuario, $idPlano)
+        {
             $idColumn = 'id' . ucfirst($tipoUsuario);
             $tableName = $tipoUsuario . 's';
-            if ($tipoUsuario === 'dev') { // Devs não têm planos
+            if ($tipoUsuario === 'dev') {
                 return true;
             }
             $query = "UPDATE " . $tableName . " SET idPlano = :idPlano WHERE " . $idColumn . " = :idUsuario";
@@ -198,7 +212,8 @@
             return $stmt->execute();
         }
 
-        public function getPlanoBasicoId($tipoUsuario) {
+        public function getPlanoBasicoId($tipoUsuario)
+        {
             $query = "SELECT idPlano FROM planos WHERE nome LIKE ? AND tipo_usuario = ? AND valor_mensal = 0.00";
             $stmt = $this->conn->prepare($query);
             $nomePlano = ucfirst($tipoUsuario) . ' Básico';
@@ -209,8 +224,9 @@
             return $result ? $result['idPlano'] : null;
         }
 
-        // Métodos para exclusão de conta (soft delete)
-        public function softDeleteConta($idUsuario, $tipoUsuario) {
+        // Métodos para exclusão de conta
+        public function softDeleteConta($idUsuario, $tipoUsuario)
+        {
             if ($tipoUsuario === 'dev') {
                 return ['success' => false, 'error' => 'Não é permitido excluir contas de desenvolvedor via esta funcionalidade.'];
             }
@@ -221,13 +237,11 @@
             try {
                 $this->conn->beginTransaction();
 
-                // 1. Marcar a conta como 'Excluida'
                 $query = "UPDATE " . $tableName . " SET status_conta = 'Excluida' WHERE " . $idColumn . " = :idUsuario";
                 $stmt = $this->conn->prepare($query);
                 $stmt->bindParam(":idUsuario", $idUsuario);
                 $stmt->execute();
 
-                // 2. Cancelar a assinatura ativa (se houver)
                 $this->cancelarAssinaturaAtual($idUsuario, $tipoUsuario);
 
                 $this->conn->commit();
@@ -238,14 +252,16 @@
             }
         }
 
-        public function desvincularAlunosDoPersonal($idPersonal) {
+        public function desvincularAlunosDoPersonal($idPersonal)
+        {
             $query = "UPDATE alunos SET idPersonal = NULL, status_vinculo = 'Inativo' WHERE idPersonal = :idPersonal";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idPersonal", $idPersonal);
             return $stmt->execute();
         }
 
-        public function isAlunoVinculadoAoPersonal($idAluno, $idPersonal) {
+        public function isAlunoVinculadoAoPersonal($idAluno, $idPersonal)
+        {
             $query = "SELECT COUNT(*) FROM alunos WHERE idAluno = :idAluno AND idPersonal = :idPersonal AND status_vinculo = 'Ativo'";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idAluno", $idAluno);
@@ -254,7 +270,8 @@
             return $stmt->fetchColumn() > 0;
         }
 
-        public function getAlunosDoPersonal($idPersonal) {
+        public function getAlunosDoPersonal($idPersonal)
+        {
             $query = "SELECT idAluno, nome, email, status_vinculo FROM alunos WHERE idPersonal = :idPersonal AND status_conta = 'Ativa'";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idPersonal", $idPersonal);
@@ -262,7 +279,8 @@
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        public function getTreinosCriadosPorPersonal($idPersonal) {
+        public function getTreinosCriadosPorPersonal($idPersonal)
+        {
             $query = "SELECT idTreinosP, nomeTreino FROM treinospersonal WHERE idPersonal = :idPersonal";
             $stmt = $this->conn->prepare($query);
             $stmt->bindParam(":idPersonal", $idPersonal);
