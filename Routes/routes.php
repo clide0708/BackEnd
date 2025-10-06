@@ -6,7 +6,9 @@ require_once __DIR__ . '/../Config/jwt.config.php';
 // Define as rotas do sistema
 $routes = [
 
-    // Rotas para Cadastro
+    // =============================
+    // ROTAS PARA CADASTRO
+    // =============================
     'cadastro/aluno' => [
         'controller' => 'CadastroController',
         'method' => 'cadastrarAluno'
@@ -40,7 +42,9 @@ $routes = [
         'method' => 'verificarCnpj'
     ],
 
-    // Rotas para Autenticação
+    // =============================
+    // ROTAS PARA AUTENTICAÇÃO
+    // =============================
     'auth/login' => [
         'controller' => 'AuthController',
         'method' => 'login'
@@ -62,7 +66,9 @@ $routes = [
         'method' => 'verificarAutenticacao'
     ],
 
-    // Rotas para ExercíciosController
+    // =============================
+    // ROTAS PARA EXERCÍCIOS
+    // =============================
     'exercicios/buscarTodos' => [
         'controller' => 'ExerciciosController',
         'method' => 'buscarTodosExercicios'
@@ -107,141 +113,118 @@ $routes = [
         'controller' => 'ExerciciosController',
         'method' => 'listarGruposMusculares'
     ],
-
-    // Rota para buscar exercício com vídeos
     'exercicios/exercicioComVideos/(\w+)/(\d+)' => [
         'controller' => 'ExerciciosController',
         'method' => 'buscarExercicioComVideos'
     ],
 
     // =============================
-    // ROTAS PARA TREINOS CONTROLLER 
+    // ROTAS PARA TREINOS
     // =============================
-
-    // Criar treino (básico)
     'treinos/criar' => [
         'controller' => 'TreinosController',
         'method' => 'criarTreino'
     ],
-
-    // Atualizar treino (nome, tipo, descrição)
     'treinos/atualizar/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'atualizarTreino'
     ],
-
-    // Adicionar exercício ao treino
     'treinos/(\d+)/adicionar-exercicio' => [
         'controller' => 'TreinosController',
         'method' => 'adicionarExercicioAoTreino'
     ],
-
-    // Listar treinos do aluno
     'treinos/aluno/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'listarTreinosAluno'
     ],
-
-    // Listar treinos do personal
     'treinos/personal/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'listarTreinosPersonal'
     ],
-
     'treinos/aluno' => [
         'controller' => 'TreinosController',
         'method' => 'listarTreinosAluno'
     ],
-
     'treinos/aluno/personal/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'listarTreinosAlunoComPersonal'
     ],
-
-    // Atribuir treino a aluno
-    'treinos/atribuir' => [
-        'controller' => 'TreinosController',
-        'method' => 'atribuirTreinoAluno'
-    ],
-
-    // Excluir treino
-    'treinos/excluir/(\d+)' => [
-        'controller' => 'TreinosController',
-        'method' => 'excluirTreino'
-    ],
-
-    // Listar alunos do personal
-    'treinos/personal/(\d+)/alunos' => [
-        'controller' => 'TreinosController',
-        'method' => 'listarAlunosDoPersonal'
-    ],
-
-    // Listar treinos atribuídos a um aluno específico
-    'treinos/personal/(\d+)/aluno/(\d+)' => [
-        'controller' => 'TreinosController',
-        'method' => 'listarTreinosDoAlunoAtribuidos'
-    ],
-
-    // Atualizar treino atribuído
-    'treinos/atribuido/(\d+)/atualizar' => [
-        'controller' => 'TreinosController',
-        'method' => 'atualizarTreinoAtribuido'
-    ],
-
-    // Desatribuir treino do aluno
-    'treinos/atribuido/(\d+)/desatribuir' => [
-        'controller' => 'TreinosController',
-        'method' => 'desatribuirTreinoDoAluno'
-    ],
-
-    // Desvincular aluno do personal
-    'personal/(\d+)/desvincular-aluno/(\d+)' => [
-        'controller' => 'TreinosController',
-        'method' => 'desvincularAluno'
-    ],
-
-    // Listar meus treinos (personal)
-    'treinos/personal/(\d+)/meus-treinos' => [
-        'controller' => 'TreinosController',
-        'method' => 'listarMeusTreinosPersonal'
-    ],
-
-    // Buscar exercícios para treino
-    'treinos/buscarExercicios' => [
-        'controller' => 'TreinosController',
-        'method' => 'buscarExercicios'
-    ],
-
     'treinos/(\d+)/exercicios' => [
         'controller' => 'TreinosController',
         'method' => 'listarExerciciosDoTreino'
     ],
-
-    // Atualizar exercício no treino
     'treinos/exercicio/(\d+)/atualizar' => [
         'controller' => 'TreinosController',
         'method' => 'atualizarExercicioNoTreino'
     ],
-
-    // Remover exercício do treino
     'treinos/exercicio/(\d+)/remover' => [
         'controller' => 'TreinosController',
         'method' => 'removerExercicioDoTreino'
     ],
-
-    // Listar treinos do usuário autenticado
+    'treinos/atribuir' => [
+        'controller' => 'TreinosController',
+        'method' => 'atribuirTreinoAluno'
+    ],
+    'treinos/excluir/(\d+)' => [
+        'controller' => 'TreinosController',
+        'method' => 'excluirTreino'
+    ],
+    'treinos/personal/(\d+)/alunos' => [
+        'controller' => 'TreinosController',
+        'method' => 'listarAlunosDoPersonal'
+    ],
+    'treinos/personal/(\d+)/aluno/(\d+)' => [
+        'controller' => 'TreinosController',
+        'method' => 'listarTreinosDoAlunoAtribuidos'
+    ],
+    'treinos/atribuido/(\d+)/atualizar' => [
+        'controller' => 'TreinosController',
+        'method' => 'atualizarTreinoAtribuido'
+    ],
+    'treinos/atribuido/(\d+)/desatribuir' => [
+        'controller' => 'TreinosController',
+        'method' => 'desatribuirTreinoDoAluno'
+    ],
+    'personal/(\d+)/desvincular-aluno/(\d+)' => [
+        'controller' => 'TreinosController',
+        'method' => 'desvincularAluno'
+    ],
+    'treinos/personal/(\d+)/meus-treinos' => [
+        'controller' => 'TreinosController',
+        'method' => 'listarMeusTreinosPersonal'
+    ],
+    'treinos/buscarExercicios' => [
+        'controller' => 'TreinosController',
+        'method' => 'buscarExercicios'
+    ],
     'treinos/listarUsuario' => [
         'controller' => 'TreinosController',
         'method' => 'listarTreinosUsuario'
     ],
-
-    // Buscar treino completo com exercícios e vídeos
     'treinos/buscarCompleto/(\d+)' => [
         'controller' => 'TreinosController',
         'method' => 'buscarTreinoCompleto'
     ],
 
-    // Rotas para Alimentos
+    // =============================
+    // ROTAS PARA ALIMENTOS
+    // =============================
+    'alimentos/criar-refeicao' => [
+        'controller' => 'AlimentosController',
+        'method' => 'criarRefeicao'
+    ],
+    'alimentos/remover-refeicao' => [
+        'controller' => 'AlimentosController',
+        'method' => 'removerRefeicao'
+    ],
+    'alimentos/listar-refeicoes' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoes'
+    ],
+    'alimentos/listar-refeicoes-simples' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoesSimples'
+    ],
     'alimentos/buscar' => [
         'controller' => 'AlimentosController',
         'method' => 'buscarAlimentos'
@@ -274,14 +257,31 @@ $routes = [
         'controller' => 'AlimentosController',
         'method' => 'listarTotais'
     ],
+    'alimentos/refeicao/alimentos' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarAlimentosRefeicao'
+    ],
 
-    // Rota para testar conexão
+    'alimentos/diagnosticar' => [
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarRefeicoes'
+    ],
+
+    'alimentos/diagnosticar-alimentos' => [
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarAlimentos'
+    ],
+
+    // =============================
+    // ROTAS PARA CONFIGURAÇÃO
+    // =============================
     'config/testarConexao' => [
         'controller' => 'ConfigController',
         'method' => 'testarConexaoDB'
     ],
 
     // Rotas para ConvitesController
+
     'convites/criar' => [
         'controller' => 'ConvitesController',
         'method' => 'criarConvite'
@@ -300,7 +300,9 @@ $routes = [
         'method' => 'negarConvite'
     ],
 
-    // Rotas para Recuperação de Senha
+    // =============================
+    // ROTAS PARA RECUPERAÇÃO DE SENHA
+    // =============================
     'recuperacao-senha/esqueci-senha' => [
         'controller' => 'RecuperacaoSenhaController',
         'method' => 'esqueciSenha'
@@ -310,7 +312,9 @@ $routes = [
         'method' => 'resetarSenha'
     ],
 
-    // Rotas para Perfil
+    // =============================
+    // ROTAS PARA PERFIL
+    // =============================
     'perfil/aluno/(\d+)' => [
         'controller' => 'PerfilController',
         'method' => 'getPerfilAluno'
@@ -380,7 +384,9 @@ $routes = [
         'method' => 'excluirConta'
     ],
 
-    // Rotas para Planos
+    // =============================
+    // ROTAS PARA PLANOS
+    // =============================
     'planos' => [
         'controller' => 'PlanosController',
         'method' => 'getAllPlanos'
@@ -402,7 +408,9 @@ $routes = [
         'method' => 'deletePlano'
     ],
 
-    // Rotas para Pagamentos
+    // =============================
+    // ROTAS PARA PAGAMENTOS
+    // =============================
     'pagamentos/iniciar' => [
         'controller' => 'PagamentosController',
         'method' => 'iniciarPagamento'
@@ -458,6 +466,7 @@ function dispatch($path, $routes, $controller_paths, $method_http)
         'auth/logout',
         'auth/obter-usuario',
         'auth/verificar-autenticacao',
+
         'cadastro/aluno',
         'cadastro/personal',
         'cadastro/academia',
@@ -466,13 +475,30 @@ function dispatch($path, $routes, $controller_paths, $method_http)
         'cadastro/verificar-cpf',
         'cadastro/verificar-rg',
         'cadastro/verificar-cnpj',
+
         'config/testarConexao',
+
         'recuperacao-senha/esqueci-senha',
         'recuperacao-senha/resetar-senha',
+
         'alimentos/buscar',
         'alimentos/informacao',
         'alimentos/testar-traducao',
+        'alimentos/listar',
+        'alimentos/totais',
+        'alimentos/criar-refeicao',
+        'alimentos/remover-refeicao',
+        'alimentos/listar-refeicoes-simples',
+        'alimentos/listar-refeicoes',
+        'alimentos/refeicao/alimentos',
+
+
+
+        // 'alimentos/diagnosticar',
+
         'convites/([a-zA-Z0-9]{64})',
+        'convites/aluno/([^/]+)',
+
         'perfil/aluno/(\d+)',
         'perfil/personal/(\d+)',
         'perfil/academia/(\d+)',
@@ -480,12 +506,21 @@ function dispatch($path, $routes, $controller_paths, $method_http)
         'perfil/aluno',
         'perfil/personal',
         'perfil/academia',
+
         'planos',
         'planos/(\d+)',
     ];
 
     // Se a rota não for pública, exige autenticação
-    if (!in_array($clean_path, $rotasPublicas)) {
+    $isPublicRoute = false;
+    foreach ($rotasPublicas as $rotaPublica) {
+        if (preg_match('#^' . $rotaPublica . '$#', $clean_path)) {
+            $isPublicRoute = true;
+            break;
+        }
+    }
+
+    if (!$isPublicRoute) {
         autenticar();
     }
 
@@ -518,73 +553,80 @@ function dispatch($path, $routes, $controller_paths, $method_http)
                 $controller_instance = new $controller_name();
 
                 if (method_exists($controller_instance, $method_name)) {
-                    // Captura parâmetros da query string se não houver parâmetros na URL
-                    if (empty($params)) {
-                        parse_str($_SERVER['QUERY_STRING'] ?? '', $query_params);
-
-                        // Para métodos GET, pega parâmetros específicos baseados no método
-                        if ($method_http === 'GET') {
-                            switch ($method_name) {
-                                case 'buscarPorID':
-                                    if (isset($query_params['id'])) {
-                                        $params[] = $query_params['id'];
-                                    }
-                                    break;
-                                case 'deletarExercicio':
-                                    if (isset($query_params['id'])) {
-                                        $params[] = $query_params['id'];
-                                    }
-                                    break;
-                                case 'verificarEmail':
-                                    if (isset($query_params['email'])) {
-                                        $params[] = ['email' => $query_params['email']];
-                                    }
-                                    break;
-                                case 'verificarCpf':
-                                    if (isset($query_params['cpf'])) {
-                                        $params[] = ['cpf' => $query_params['cpf']];
-                                    }
-                                    break;
-                                case 'verificarCnpj':
-                                    if (isset($query_params['cnpj'])) {
-                                        $params[] = ['cnpj' => $query_params['cnpj']];
-                                    }
-                                    break;
-                            }
-                        }
-                    }
-
-                    // Captura os dados do corpo da requisição para POST, PUT
-                    $data = [];
-                    if (in_array($method_http, ['POST', 'PUT'])) {
-                        $content_type = $_SERVER['CONTENT_TYPE'] ?? '';
-
-                        if (strpos($content_type, 'application/json') !== false) {
-                            $data = json_decode(file_get_contents('php://input'), true);
-                            if ($data === null) {
-                                $data = [];
-                            }
-                        } else {
-                            $data = $_POST;
-                        }
-                    }
+                    // Captura parâmetros da query string
+                    parse_str($_SERVER['QUERY_STRING'] ?? '', $query_params);
 
                     // Prepara os parâmetros para chamar o método
                     $method_params = [];
 
-                    // Adiciona parâmetros da URL ou query string
+                    // Adiciona parâmetros da URL (se houver)
                     if (!empty($params)) {
                         $method_params = array_merge($method_params, $params);
                     }
 
-                    // Adiciona dados do corpo para POST/PUT
-                    if (in_array($method_http, ['POST', 'PUT']) && !empty($data)) {
-                        $method_params[] = $data;
+                    // CORREÇÃO: Para métodos específicos que usam query parameters
+                    // Se não há parâmetros na URL, tenta pegar da query string
+                    if (empty($method_params)) {
+                        switch ($method_name) {
+                            case 'buscarPorNome':
+                                if (isset($query_params['nome'])) {
+                                    $method_params[] = $query_params['nome'];
+                                }
+                                break;
+                            case 'buscarPorID':
+                            case 'deletarExercicio':
+                                if (isset($query_params['id'])) {
+                                    $method_params[] = $query_params['id'];
+                                }
+                                break;
+                            case 'verificarEmail':
+                                if (isset($query_params['email'])) {
+                                    $method_params[] = ['email' => $query_params['email']];
+                                }
+                                break;
+                            case 'verificarCpf':
+                                if (isset($query_params['cpf'])) {
+                                    $method_params[] = ['cpf' => $query_params['cpf']];
+                                }
+                                break;
+                            case 'verificarCnpj':
+                                if (isset($query_params['cnpj'])) {
+                                    $method_params[] = ['cnpj' => $query_params['cnpj']];
+                                }
+                                break;
+                            case 'verificarRg':
+                                if (isset($query_params['rg'])) {
+                                    $method_params[] = ['rg' => $query_params['rg']];
+                                }
+                                break;
+                        }
+                    }
+
+                    // Captura os dados do corpo da requisição para POST, PUT, PATCH
+                    $data = [];
+                    if (in_array($method_http, ['POST', 'PUT', 'PATCH'])) {
+                        $content_type = $_SERVER['CONTENT_TYPE'] ?? '';
+
+                        if (strpos($content_type, 'application/json') !== false) {
+                            $input = file_get_contents('php://input');
+                            $data = json_decode($input, true) ?? [];
+                        } else {
+                            $data = $_POST;
+                        }
+
+                        // Adiciona dados do corpo para POST/PUT/PATCH
+                        if (!empty($data)) {
+                            $method_params[] = $data;
+                        }
                     }
 
                     // Verifica se os parâmetros necessários estão presentes
                     $reflection = new ReflectionMethod($controller_instance, $method_name);
                     $required_params = $reflection->getNumberOfRequiredParameters();
+
+                    // DEBUG: Log para verificar os parâmetros (remover em produção)
+                    error_log("Método: $method_name, Requeridos: $required_params, Fornecidos: " . count($method_params));
+                    error_log("Parâmetros: " . print_r($method_params, true));
 
                     if (count($method_params) >= $required_params) {
                         // Chama o método do controlador com os parâmetros
@@ -595,7 +637,14 @@ function dispatch($path, $routes, $controller_paths, $method_http)
                             call_user_func([$controller_instance, $method_name]);
                         } else {
                             http_response_code(400);
-                            echo json_encode(["error" => "Parâmetros insuficientes para o método '$method_name'"]);
+                            echo json_encode([
+                                "error" => "Parâmetros insuficientes para o método '$method_name'",
+                                "required" => $required_params,
+                                "provided" => count($method_params),
+                                "params_received" => $method_params,
+                                "query_params" => $query_params,
+                                "path" => $clean_path
+                            ]);
                         }
                     }
                 } else {
