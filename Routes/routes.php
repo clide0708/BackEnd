@@ -353,6 +353,18 @@ $routes = [
     ],
 
     // Rotas para Perfil
+
+    'perfil/usuario/([A-Za-z0-9@._-]+)' => [
+        'controller' => 'PerfilController',
+        'method' => 'getUsuarioPorEmail'
+    ],
+
+    'perfil/atualizar' => [
+        'controller' => 'PerfilController',
+        'method' => 'atualizarPerfil',
+        'http_method' => 'PUT'
+    ],
+
     'perfil/aluno/(\d+)' => [
         'controller' => 'PerfilController',
         'method' => 'getPerfilAluno'
@@ -365,6 +377,12 @@ $routes = [
         'controller' => 'PerfilController',
         'method' => 'putPerfilAluno'
     ],
+
+    'perfil/personalNM/(\d+)' => [
+        'controller' => 'PerfilController', // ou PersonalController
+        'method' => 'getPersonalPorId'
+    ],
+
     'perfil/personal/(\d+)' => [
         'controller' => 'PerfilController',
         'method' => 'getPerfilPersonal'

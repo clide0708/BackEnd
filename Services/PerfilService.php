@@ -129,4 +129,64 @@ class PerfilService
     {
         return $this->perfilRepository->getTreinosCriadosPorPersonal($idPersonal);
     }
+
+    public function getUsuarioPorEmail($email, $usuarioLogado = null)
+    {
+        if (!$usuarioLogado) {
+            return ['success' => false, 'error' => 'Usuário não autenticado.'];
+        }
+
+        $usuario = $this->perfilRepository->findByEmail($email);
+
+        if (!$usuario) {
+            return ['success' => false, 'error' => 'Usuário não encontrado.'];
+        }
+
+        // // regra de acesso: aluno só vê o próprio perfil
+        // if ($usuarioLogado['tipo'] === 'aluno' && $usuarioLogado['sub'] != $usuario['id']) {
+        //     return ['success' => false, 'error' => 'Acesso negado.'];
+        // }
+
+        return ['success' => true, 'data' => $usuario];
+    }
+
+    public function atualizarPerfil($data)
+    {
+        $email = $data['email'];
+        $repo = new PerfilRepository();
+
+        $usuario = $repo->findByEmail($email);
+
+        if (!$usuario) {
+            return ['success' => false, 'error' => 'Usuário não encontrado'];
+        }
+
+        $tipo = $usuario['tipo'];
+
+        if ($tipo === 'alunos') {
+            $campos = [
+                'altura' => $data['altura'] ?? null,
+                'idade' => $data['idade'] ?? null,
+                'genero' => $data['genero'] ?? null,
+                'treinoTipo' => $data['treinoTipo'] ?? null,
+                'meta' => $data['meta'] ?? null,
+                'foto_perfil' => $data['foto_perfil'] ?? null,
+                'peso' => $data['peso'] ?? null,
+            ];
+        } else {
+            $campos = [
+                'idade' => $data['idade'] ?? null,
+                'genero' => $data['genero'] ?? null,
+                'foto_perfil' => $data['foto_perfil'] ?? null,
+            ];
+        }
+
+        $resultado = $repo->updatePerfil($tipo, $email, $campos);
+
+        if ($resultado) {
+            return ['success' => true, 'message' => 'Perfil atualizado com sucesso'];
+        } else {
+            return ['success' => false, 'error' => 'Erro ao atualizar perfil'];
+        }
+    }
 }
