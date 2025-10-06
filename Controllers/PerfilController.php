@@ -7,6 +7,8 @@ class PerfilController
     private $perfilService;
     private $idUsuarioLogado;
     private $tipoUsuarioLogado;
+    private $usuarioLogado;
+
 
     public function __construct()
     {
@@ -16,10 +18,12 @@ class PerfilController
         if (isset($_SERVER['user'])) {
             $this->idUsuarioLogado = $_SERVER['user']['sub'];
             $this->tipoUsuarioLogado = $_SERVER['user']['tipo'];
+            $this->usuarioLogado = $_SERVER['user'];
         } else {
             // Para rotas que não exigem autenticação ou para testes
             $this->idUsuarioLogado = null;
             $this->tipoUsuarioLogado = null;
+            $this->usuarioLogado = null;
         }
     }
 
@@ -404,5 +408,20 @@ class PerfilController
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Nenhum treino encontrado para este personal ou acesso negado.']);
         }
+    }
+
+    public function getUsuarioPorEmail($email)
+    {
+        header('Content-Type: application/json');
+
+        $result = $this->perfilService->getUsuarioPorEmail($email, $this->usuarioLogado);
+
+        if ($result['success']) {
+            http_response_code(200);
+        } else {
+            http_response_code($result['error'] === 'Usuário não encontrado.' ? 404 : 403);
+        }
+
+        echo json_encode($result);
     }
 }

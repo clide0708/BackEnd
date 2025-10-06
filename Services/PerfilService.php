@@ -129,4 +129,24 @@ class PerfilService
     {
         return $this->perfilRepository->getTreinosCriadosPorPersonal($idPersonal);
     }
+
+    public function getUsuarioPorEmail($email, $usuarioLogado = null)
+    {
+        if (!$usuarioLogado) {
+            return ['success' => false, 'error' => 'Usuário não autenticado.'];
+        }
+
+        $usuario = $this->perfilRepository->findByEmail($email);
+
+        if (!$usuario) {
+            return ['success' => false, 'error' => 'Usuário não encontrado.'];
+        }
+
+        // // regra de acesso: aluno só vê o próprio perfil
+        // if ($usuarioLogado['tipo'] === 'aluno' && $usuarioLogado['sub'] != $usuario['id']) {
+        //     return ['success' => false, 'error' => 'Acesso negado.'];
+        // }
+
+        return ['success' => true, 'data' => $usuario];
+    }
 }

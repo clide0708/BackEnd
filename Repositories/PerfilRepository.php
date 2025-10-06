@@ -326,4 +326,32 @@ class PerfilRepository
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function findByEmail($email)
+    {
+        // procura primeiro na tabela aluno
+        $queryAluno = "SELECT *, 'alunos' AS tipo FROM alunos WHERE email = :email LIMIT 1";
+        $stmt = $this->conn->prepare($queryAluno);
+        $stmt->bindValue(':email', $email, PDO::PARAM_STR);
+        $stmt->execute();
+        $aluno = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($aluno) {
+            return $aluno;
+        }
+
+        // se não achou, procura na tabela personal
+        $queryPersonal = "SELECT *, 'personal' AS tipo FROM personal WHERE email = :email LIMIT 1";
+        $stmt = $this->conn->prepare($queryPersonal);
+        $stmt->bindValue(':email', $email, PDO::PARAM_STR);
+        $stmt->execute();
+        $personal = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($personal) {
+            return $personal;
+        }
+
+        // se não achou em nenhuma
+        return null;
+    }
 }
