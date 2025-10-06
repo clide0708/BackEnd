@@ -331,7 +331,7 @@ $routes = [
     ],
     'convites/email/([^/]+)' => [
     'controller' => 'ConvitesController', 
-    'method' => 'getConvites'
+    'method' => 'getConvitesByEmail'
     ],
     'convites/(\d+)/aceitar' => [
         'controller' => 'ConvitesController',
