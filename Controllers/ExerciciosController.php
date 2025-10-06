@@ -65,53 +65,6 @@
                     http_response_code(404);
                     echo json_encode(["error" => "Nenhum exercício encontrado com esse nome"]);
                 }
-
-                if ($nome = null) {
-                    header('Content-Type: application/json');
-                    
-                    // Se não veio por parâmetro, tenta pegar da query string
-                    if ($nome === null) {
-                        $nome = $_GET['nome'] ?? '';
-                    }
-                    
-                    if (empty($nome)) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'error' => 'Nome do exercício é obrigatório']);
-                        return;
-                    }
-
-                    try {
-                        // Decodifica URL encoding se necessário
-                        $nome = urldecode($nome);
-                        
-                        $stmt = $this->conn->prepare("
-                            SELECT * FROM exercicios 
-                            WHERE nome LIKE ? AND status = 'ativo'
-                            ORDER BY nome
-                        ");
-                        $searchTerm = '%' . $nome . '%';
-                        $stmt->execute([$searchTerm]);
-                        $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                        if ($exercicios) {
-                            http_response_code(200);
-                            echo json_encode([
-                                'success' => true,
-                                'data' => $exercicios,
-                                'total' => count($exercicios)
-                            ]);
-                        } else {
-                            http_response_code(404);
-                            echo json_encode([
-                                'success' => false,
-                                'error' => 'Nenhum exercício encontrado com esse nome'
-                            ]);
-                        }
-                    } catch (PDOException $e) {
-                        http_response_code(500);
-                        echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
-                    }
-                }
             } catch (PDOException $e) {
                 http_response_code(500);
                 echo json_encode(["error" => "Erro ao buscar exercício: " . $e->getMessage()]);
@@ -162,60 +115,18 @@
                     return;
                 }
 
-                // Primeiro, busca o exercício atual para preservar campos não enviados
-                $stmtSelect = $this->db->prepare("SELECT * FROM exercicios WHERE idExercicio = ?");
-                $stmtSelect->execute([$id]);
-                $exercicioAtual = $stmtSelect->fetch(PDO::FETCH_ASSOC);
-
-                if (!$exercicioAtual) {
-                    http_response_code(404);
-                    echo json_encode(['success' => false, 'error' => 'Exercício não encontrado']);
-                    return;
-                }
-
-                // Prepara os campos para atualização (atualização parcial)
-                $campos = [];
-                $valores = [];
-
-                if (isset($data['nome'])) {
-                    $campos[] = "nome = ?";
-                    $valores[] = $data['nome'];
-                }
-
-                if (isset($data['grupoMuscular'])) {
-                    $campos[] = "grupoMuscular = ?";
-                    $valores[] = $data['grupoMuscular'];
-                }
-
-                if (isset($data['descricao'])) {
-                    $campos[] = "descricao = ?";
-                    $valores[] = $data['descricao'];
-                }
-
-                // CORREÇÃO: Verifica se cadastradoPor foi enviado, senão mantém o atual
-                if (isset($data['cadastradoPor'])) {
-                    $campos[] = "cadastradoPor = ?";
-                    $valores[] = $data['cadastradoPor'];
-                }
-
-                // Se nenhum campo foi enviado para atualizar
-                if (empty($campos)) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'Nenhum campo para atualizar']);
-                    return;
-                }
-
-                // Adiciona o ID aos valores
-                $valores[] = $id;
-
-                // Monta a query dinamicamente
-                $sql = "UPDATE exercicios SET " . implode(', ', $campos) . " WHERE idExercicio = ?";
-                $stmt = $this->db->prepare($sql);
-                $success = $stmt->execute($valores);
+                $stmt = $this->db->prepare("UPDATE exercicios SET nome = ?, grupoMuscular = ?, descricao = ?, cadastradoPor = ? WHERE idExercicio = ?");
+                $success = $stmt->execute([
+                    $data['nome'], 
+                    $data['grupoMuscular'], 
+                    $data['descricao'], 
+                    $data['cadastradoPor'],
+                    $id // CORREÇÃO: Adicionar o ID como quinto parâmetro
+                ]);
                 
                 if ($success && $stmt->rowCount() > 0) {
                     http_response_code(200);
-                    echo json_encode(['success' => true, 'message' => 'Exercício atualizado com sucesso']);
+                    echo json_encode(['success' => true]);
                 } else {
                     http_response_code(404);
                     echo json_encode(['success' => false, 'error' => 'Exercício não encontrado ou dados idênticos']);
@@ -254,35 +165,6 @@
                 echo json_encode(['success' => false, 'error' => 'Erro ao deletar exercício: ' . $e->getMessage()]);
             }
         }
-
-            public function listarGruposMusculares() {
-                try {
-                    // Busca todos os grupos musculares distintos da tabela exercicios
-                    $stmt = $this->db->query("SELECT DISTINCT grupoMuscular FROM exercicios WHERE grupoMuscular IS NOT NULL AND grupoMuscular != '' ORDER BY grupoMuscular");
-                    $grupos = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                    
-                    if ($grupos) {
-                        http_response_code(200);
-                        echo json_encode([
-                            'success' => true,
-                            'gruposMusculares' => $grupos,
-                            'total' => count($grupos)
-                        ]);
-                    } else {
-                        http_response_code(404);
-                        echo json_encode([
-                            'success' => false,
-                            'error' => 'Nenhum grupo muscular encontrado'
-                        ]);
-                    }
-                } catch (PDOException $e) {
-                    http_response_code(500);
-                    echo json_encode([
-                        'success' => false,
-                        'error' => 'Erro ao buscar grupos musculares: ' . $e->getMessage()
-                    ]);
-                }
-            }
 
         // Novo método para buscar exercício com vídeos
         public function buscarExercicioComVideos($tipo, $id) {

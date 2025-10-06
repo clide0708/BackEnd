@@ -1,5 +1,5 @@
-<?php
- 
+<?php 
+
     class DB {
         private static function tentarConexao($envFile) {
             if (!file_exists($envFile)) return null;
@@ -49,5 +49,5 @@
     function connectDB() {
         return DB::connectDB();
     }
-
+    
 ?>
