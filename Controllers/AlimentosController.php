@@ -72,19 +72,82 @@
             }
         }
 
-        // Listar refeições do aluno
-        public function listarRefeicoes()
-        {
+        // Listar refeições diretamente
+        public function listarRefeicoesSimples() {
             header('Content-Type: application/json');
             try {
                 $dataRef = $_GET['data_ref'] ?? null;
-                $refeicoes = $this->service->listarRefeicoesAluno($this->idAluno, $dataRef);
+                
+                // Conexão direta com o banco para diagnóstico
+                $pdo = DB::connectDB();
+                
+                $sql = "SELECT id, nome_tipo, data_ref FROM refeicoes_tipos WHERE idAluno = ?";
+                $params = [$this->idAluno];
+                
+                if ($dataRef) {
+                    $sql .= " AND DATE(data_ref) = ?";
+                    $params[] = $dataRef;
+                }
+                
+                $sql .= " ORDER BY data_ref DESC";
+                
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $refeicoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true, 
+                    'refeicoes' => $refeicoes,
+                    'debug' => [
+                        'id_aluno' => $this->idAluno,
+                        'total_refeicoes' => count($refeicoes)
+                    ]
+                ]);
+            } catch (Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
+        // Listar refeições do aluno
+        public function listarRefeicoes() {
+            header('Content-Type: application/json');
+            try {
+                $dataRef = $_GET['data_ref'] ?? null;
+                
+                // DEBUG: Verificar se o idAluno está correto
+                error_log("ID Aluno no Controller: " . $this->idAluno);
+                
+                // Busca as refeições básicas diretamente do repositório se necessário
+                $refeicoes = $this->service->listarRefeicoesCompletas($this->idAluno, $dataRef);
+                
+                // DEBUG: Verificar o resultado
+                error_log("Refeições encontradas: " . count($refeicoes));
+                
                 echo json_encode(['success' => true, 'refeicoes' => $refeicoes]);
             } catch (Exception $e) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
+
+        // private function calcularTotaisRefeicao(array $alimentos): array {
+        //     $totais = ['calorias' => 0, 'proteinas' => 0, 'carboidratos' => 0, 'gorduras' => 0];
+            
+        //     foreach ($alimentos as $alimento) {
+        //         $totais['calorias'] += (float)($alimento['calorias'] ?? 0);
+        //         $totais['proteinas'] += (float)($alimento['proteinas'] ?? 0);
+        //         $totais['carboidratos'] += (float)($alimento['carboidratos'] ?? 0);
+        //         $totais['gorduras'] += (float)($alimento['gorduras'] ?? 0);
+        //     }
+            
+        //     return [
+        //         'calorias' => round($totais['calorias'], 2),
+        //         'proteinas' => round($totais['proteinas'], 2),
+        //         'carboidratos' => round($totais['carboidratos'], 2),
+        //         'gorduras' => round($totais['gorduras'], 2)
+        //     ];
+        // }
 
         // Buscar alimentos com tradução
         public function buscarAlimentos()
@@ -157,29 +220,54 @@
             }
         }
 
-        // Listar alimentos de uma refeição - CORREÇÃO
-        public function listarAlimentos()
+        // Listar alimentos de uma refeição específica
+        public function listarAlimentosRefeicao()
         {
             header('Content-Type: application/json');
-            header('Cache-Control: no-cache, no-store, must-revalidate');
-            header('Pragma: no-cache');
-            header('Expires: 0');
-
             try {
-                $lista = $_GET['lista'] ?? '';
-                if (!$lista) {
-                    throw new Exception('Tipo de refeição não informado');
+                $idRefeicao = $_GET['id_refeicao'] ?? 0;
+                
+                if (!$idRefeicao) {
+                    throw new Exception('ID da refeição é obrigatório');
                 }
+
+                $alimentos = $this->service->listarAlimentosRefeicao($idRefeicao, $this->idAluno);
                 
-                // CORREÇÃO: Use o método correto que existe no Service
-                $alimentos = $this->service->listarAlimentos($lista, $this->idAluno);
-                
-                echo json_encode(['success' => true, 'alimentos' => $alimentos]);
+                echo json_encode([
+                    'success' => true, 
+                    'id_refeicao' => $idRefeicao,
+                    'alimentos' => $alimentos,
+                    'total_itens' => count($alimentos)
+                ]);
             } catch (Exception $e) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
+
+        // // Listar alimentos de uma refeição - CORREÇÃO
+        // public function listarAlimentos()
+        // {
+        //     header('Content-Type: application/json');
+        //     header('Cache-Control: no-cache, no-store, must-revalidate');
+        //     header('Pragma: no-cache');
+        //     header('Expires: 0');
+
+        //     try {
+        //         $lista = $_GET['lista'] ?? '';
+        //         if (!$lista) {
+        //             throw new Exception('Tipo de refeição não informado');
+        //         }
+                
+        //         // CORREÇÃO: Use o método correto que existe no Service
+        //         $alimentos = $this->service->listarAlimentos($lista, $this->idAluno);
+                
+        //         echo json_encode(['success' => true, 'alimentos' => $alimentos]);
+        //     } catch (Exception $e) {
+        //         http_response_code(400);
+        //         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        //     }
+        // }
 
         // Adicionar alimento
         public function addAlimento()
@@ -258,6 +346,74 @@
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
+
+        // Método temporário para diagnóstico - adicione no AlimentosController
+        public function diagnosticarRefeicoes() {
+            header('Content-Type: application/json');
+            try {
+                $dataRef = $_GET['data_ref'] ?? null;
+                
+                // Teste 1: Buscar refeições básicas
+                $refeicoesBasicas = $this->service->listarRefeicoesAluno($this->idAluno, $dataRef);
+                
+                // Teste 2: Buscar uma refeição específica se existir
+                $refeicaoDetalhada = [];
+                if (!empty($refeicoesBasicas)) {
+                    $primeiraRefeicao = $refeicoesBasicas[0];
+                    $refeicaoDetalhada = $this->service->listarAlimentosRefeicao($primeiraRefeicao['id'], $this->idAluno);
+                }
+                
+                echo json_encode([
+                    'success' => true,
+                    'diagnostico' => [
+                        'id_aluno' => $this->idAluno,
+                        'refeicoes_basicas' => $refeicoesBasicas,
+                        'total_refeicoes' => count($refeicoesBasicas),
+                        'primeira_refeicao_detalhada' => $refeicaoDetalhada,
+                        'data_ref' => $dataRef
+                    ]
+                ]);
+            } catch (Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        } 
+
+        public function diagnosticarAlimentos() {
+            header('Content-Type: application/json');
+            try {
+                $idRefeicao = $_GET['id_refeicao'] ?? 1; // Teste com a refeição ID 1
+                
+                // Diagnóstico passo a passo
+                $diagnostico = [
+                    'id_refeicao_testada' => $idRefeicao,
+                    'passo_1_direct_query' => $this->queryDiretaItensRefeicao($idRefeicao),
+                    'passo_2_repository_method' => $this->service->listarAlimentosRefeicao($idRefeicao, $this->idAluno),
+                    'passo_3_sql_count' => $this->countItensRefeicao($idRefeicao)
+                ];
+                
+                echo json_encode(['success' => true, 'diagnostico_alimentos' => $diagnostico]);
+            } catch (Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
+        // private function queryDiretaItensRefeicao(int $idRefeicao): array {
+        //     $pdo = DB::connectDB();
+        //     $stmt = $pdo->prepare("SELECT * FROM itens_refeicao WHERE id_tipo_refeicao = ?");
+        //     $stmt->execute([$idRefeicao]);
+        //     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // }
+
+        // private function countItensRefeicao(int $idRefeicao): int {
+        //     $pdo = DB::connectDB();
+        //     $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM itens_refeicao WHERE id_tipo_refeicao = ?");
+        //     $stmt->execute([$idRefeicao]);
+        //     $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        //     return (int)($result['total'] ?? 0);
+        // }
+
     }
 
 ?>

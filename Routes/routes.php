@@ -221,6 +221,10 @@
             'controller' => 'AlimentosController',
             'method' => 'listarRefeicoes'
         ],
+        'alimentos/listar-refeicoes-simples' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoesSimples'
+        ],
         'alimentos/buscar' => [
             'controller' => 'AlimentosController',
             'method' => 'buscarAlimentos'
@@ -252,6 +256,20 @@
         'alimentos/totais' => [
             'controller' => 'AlimentosController',
             'method' => 'listarTotais'
+        ],
+        'alimentos/refeicao/alimentos' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarAlimentosRefeicao'
+        ],
+
+        'alimentos/diagnosticar' => [
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarRefeicoes'
+        ],
+
+        'alimentos/diagnosticar-alimentos' => [
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarAlimentos'
         ],
 
         // =============================
@@ -464,6 +482,7 @@
             'auth/logout',
             'auth/obter-usuario',
             'auth/verificar-autenticacao',
+
             'cadastro/aluno',
             'cadastro/personal',
             'cadastro/academia',
@@ -472,9 +491,12 @@
             'cadastro/verificar-cpf',
             'cadastro/verificar-rg',
             'cadastro/verificar-cnpj',
+
             'config/testarConexao',
+            
             'recuperacao-senha/esqueci-senha',
             'recuperacao-senha/resetar-senha',
+
             'alimentos/buscar',
             'alimentos/informacao',
             'alimentos/testar-traducao',
@@ -482,9 +504,17 @@
             'alimentos/totais',
             'alimentos/criar-refeicao',
             'alimentos/remover-refeicao',
+            'alimentos/listar-refeicoes-simples',
             'alimentos/listar-refeicoes',
+            'alimentos/refeicao/alimentos',
+
+
+
+            // 'alimentos/diagnosticar',
+
             'convites/([a-zA-Z0-9]{64})',
             'convites/aluno/([^/]+)',
+
             'perfil/aluno/(\d+)',
             'perfil/personal/(\d+)',
             'perfil/academia/(\d+)',
@@ -492,6 +522,7 @@
             'perfil/aluno',
             'perfil/personal',
             'perfil/academia',
+
             'planos',
             'planos/(\d+)',
         ];
@@ -538,40 +569,52 @@
                     $controller_instance = new $controller_name();
 
                     if (method_exists($controller_instance, $method_name)) {
-                        // Captura parâmetros da query string se não houver parâmetros na URL
-                        if (empty($params)) {
-                            parse_str($_SERVER['QUERY_STRING'] ?? '', $query_params);
+                        // Captura parâmetros da query string
+                        parse_str($_SERVER['QUERY_STRING'] ?? '', $query_params);
 
-                            // Para métodos GET, pega parâmetros específicos baseados no método
-                            if ($method_http === 'GET') {
-                                switch ($method_name) {
-                                    case 'buscarPorID':
-                                    case 'deletarExercicio':
-                                        if (isset($query_params['id'])) {
-                                            $params[] = $query_params['id'];
-                                        }
-                                        break;
-                                    case 'verificarEmail':
-                                        if (isset($query_params['email'])) {
-                                            $params[] = ['email' => $query_params['email']];
-                                        }
-                                        break;
-                                    case 'verificarCpf':
-                                        if (isset($query_params['cpf'])) {
-                                            $params[] = ['cpf' => $query_params['cpf']];
-                                        }
-                                        break;
-                                    case 'verificarCnpj':
-                                        if (isset($query_params['cnpj'])) {
-                                            $params[] = ['cnpj' => $query_params['cnpj']];
-                                        }
-                                        break;
-                                    case 'verificarRg':
-                                        if (isset($query_params['rg'])) {
-                                            $params[] = ['rg' => $query_params['rg']];
-                                        }
-                                        break;
-                                }
+                        // Prepara os parâmetros para chamar o método
+                        $method_params = [];
+
+                        // Adiciona parâmetros da URL (se houver)
+                        if (!empty($params)) {
+                            $method_params = array_merge($method_params, $params);
+                        }
+
+                        // CORREÇÃO: Para métodos específicos que usam query parameters
+                        // Se não há parâmetros na URL, tenta pegar da query string
+                        if (empty($method_params)) {
+                            switch ($method_name) {
+                                case 'buscarPorNome':
+                                    if (isset($query_params['nome'])) {
+                                        $method_params[] = $query_params['nome'];
+                                    }
+                                    break;
+                                case 'buscarPorID':
+                                case 'deletarExercicio':
+                                    if (isset($query_params['id'])) {
+                                        $method_params[] = $query_params['id'];
+                                    }
+                                    break;
+                                case 'verificarEmail':
+                                    if (isset($query_params['email'])) {
+                                        $method_params[] = ['email' => $query_params['email']];
+                                    }
+                                    break;
+                                case 'verificarCpf':
+                                    if (isset($query_params['cpf'])) {
+                                        $method_params[] = ['cpf' => $query_params['cpf']];
+                                    }
+                                    break;
+                                case 'verificarCnpj':
+                                    if (isset($query_params['cnpj'])) {
+                                        $method_params[] = ['cnpj' => $query_params['cnpj']];
+                                    }
+                                    break;
+                                case 'verificarRg':
+                                    if (isset($query_params['rg'])) {
+                                        $method_params[] = ['rg' => $query_params['rg']];
+                                    }
+                                    break;
                             }
                         }
 
@@ -586,24 +629,20 @@
                             } else {
                                 $data = $_POST;
                             }
-                        }
 
-                        // Prepara os parâmetros para chamar o método
-                        $method_params = [];
-
-                        // Adiciona parâmetros da URL ou query string
-                        if (!empty($params)) {
-                            $method_params = array_merge($method_params, $params);
-                        }
-
-                        // Adiciona dados do corpo para POST/PUT/PATCH
-                        if (in_array($method_http, ['POST', 'PUT', 'PATCH']) && !empty($data)) {
-                            $method_params[] = $data;
+                            // Adiciona dados do corpo para POST/PUT/PATCH
+                            if (!empty($data)) {
+                                $method_params[] = $data;
+                            }
                         }
 
                         // Verifica se os parâmetros necessários estão presentes
                         $reflection = new ReflectionMethod($controller_instance, $method_name);
                         $required_params = $reflection->getNumberOfRequiredParameters();
+
+                        // DEBUG: Log para verificar os parâmetros (remover em produção)
+                        error_log("Método: $method_name, Requeridos: $required_params, Fornecidos: " . count($method_params));
+                        error_log("Parâmetros: " . print_r($method_params, true));
 
                         if (count($method_params) >= $required_params) {
                             // Chama o método do controlador com os parâmetros
@@ -617,7 +656,10 @@
                                 echo json_encode([
                                     "error" => "Parâmetros insuficientes para o método '$method_name'",
                                     "required" => $required_params,
-                                    "provided" => count($method_params)
+                                    "provided" => count($method_params),
+                                    "params_received" => $method_params,
+                                    "query_params" => $query_params,
+                                    "path" => $clean_path
                                 ]);
                             }
                         }
