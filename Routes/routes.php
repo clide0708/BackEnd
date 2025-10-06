@@ -287,15 +287,9 @@
             'controller' => 'ConvitesController',
             'method' => 'criarConvite'
         ],
-        // Rota para visualizar um convite específico por token (para links)
-        'convites/([a-zA-Z0-9]{64})' => [
-            'controller' => 'ConvitesController',
-            'method' => 'getConvite'
-        ],
-        // Rota para listar todos convites de um aluno por email
-        'convites/aluno/([^/]+)' => [
-            'controller' => 'ConvitesController',
-            'method' => 'getConvites'
+       'convites/([a-zA-Z0-9]+)' => [
+        'controller' => 'ConvitesController',
+        'method' => 'getConvite'
         ],
         // Rotas para aceitar/negar por token (para links)
         'convites/([a-zA-Z0-9]{64})/aceitar' => [
