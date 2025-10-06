@@ -275,6 +275,45 @@ $routes = [
         'method' => 'listarTotais'
     ],
 
+    // Rotas para Refeições
+    'alimentos/listar-refeicoes' => [
+    'controller' => 'AlimentosController',
+    'method' => 'listarRefeicoes'
+    ],
+    'alimentos/listar-refeicoes-simples' => [
+    'controller' => 'AlimentosController',
+    'method' => 'listarRefeicoesSimples'
+    ],
+    'alimentos/criar-refeicao' => [
+    'controller' => 'AlimentosController',
+    'method' => 'criarRefeicao'
+    ],
+    'alimentos/refeicoes-hoje' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoesHoje'
+    ],
+    'alimentos/adicionar-refeicao' => [
+        'controller' => 'AlimentosController',
+        'method' => 'adicionarAlimentoRefeicao'
+    ],
+    'alimentos/refeicao/(\d+)' => [
+        'controller' => 'AlimentosController',
+        'method' => 'listarAlimentosRefeicao'
+    ],
+    'alimentos/refeicao/alimentos' => [
+    'controller' => 'AlimentosController',
+    'method' => 'listarAlimentosRefeicao'
+    ],
+
+    'alimentos/diagnosticar' => [
+    'controller' => 'AlimentosController',
+    'method' => 'diagnosticarRefeicoes'
+    ],
+    'alimentos/diagnosticar-alimentos' => [
+    'controller' => 'AlimentosController',
+    'method' => 'diagnosticarAlimentos'
+    ],
+
     // Rota para testar conexão
     'config/testarConexao' => [
         'controller' => 'ConfigController',
@@ -290,7 +329,10 @@ $routes = [
         'controller' => 'ConvitesController',
         'method' => 'getConvites'
     ],
-
+    'convites/email/([^/]+)' => [
+    'controller' => 'ConvitesController', 
+    'method' => 'getConvites'
+    ],
     'convites/(\d+)/aceitar' => [
         'controller' => 'ConvitesController',
         'method' => 'aceitarConvite'
