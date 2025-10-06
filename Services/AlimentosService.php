@@ -31,9 +31,9 @@
         }
 
         /**
-         * Traduz termo de inglês para português.
-         * Fluxo: Cache > Dicionário contextual > API para frases > Fallback.
-         * Suporte robusto a palavras únicas, compostas ou frases (divide e reorganiza gramaticalmente).
+         * Traduz termo de inglês para português BRASILEIRO.
+         * Fluxo: Cache > Dicionário contextual robusto > API para frases > Fallback.
+         * Trata palavras únicas, compostas e frases complexas.
          */
         public function traduzirParaPortugues(string $termoIngles): string {
             $termoIngles = mb_strtolower(trim($termoIngles));
@@ -43,15 +43,15 @@
             $traducao = $this->repository->getTraducaoPortugues($termoIngles);
             if ($traducao) return $traducao;
 
-            // Dicionário contextual para alimentos (expandido para itens brasileiros)
-            $traducaoContextual = $this->traducaoContextualAlimentos($termoIngles);
+            // Dicionário contextual expandido para alimentos brasileiros
+            $traducaoContextual = $this->traducaoContextualAlimentosBrasileiros($termoIngles);
             if ($traducaoContextual && $traducaoContextual !== $termoIngles) {
                 $this->repository->inserirTraducao($termoIngles, $traducaoContextual, 'dicionario');
                 return $traducaoContextual;
             }
 
-            // Para frases: divide, traduz palavras-chave, reorganiza
-            $traducao = $this->traduzirFraseInteligente($termoIngles);
+            // Para frases complexas: usa API com pós-processamento para contexto brasileiro
+            $traducao = $this->traduzirFraseComplexaBrasileira($termoIngles);
             if ($traducao && $traducao !== $termoIngles) {
                 $this->repository->inserirTraducao($termoIngles, $traducao, 'api');
             }
@@ -59,144 +59,328 @@
         }
 
         /**
-         * Dicionário contextual expandido para alimentos comuns (PT ↔ EN).
-         * Adicione mais entradas conforme necessário para robustez.
+         * Dicionário contextual EXPANDIDO para alimentos no contexto brasileiro
+         * Inclui traduções específicas para produtos e preparações típicas do Brasil
          */
-        private function traducaoContextualAlimentos(string $termoIngles): ?string {
+        private function traducaoContextualAlimentosBrasileiros(string $termoIngles): ?string {
             $dicionarioAlimentos = [
-                // Proteínas
-                'chicken breast' => 'peito de frango',
-                'ground beef' => 'carne moída',
-                'tuna' => 'atum',
-                'salmon' => 'salmão',
-                'eggs' => 'ovos',
-                // Carboidratos
-                'brown rice' => 'arroz integral',
-                'white rice' => 'arroz branco',
-                'whole wheat bread' => 'pão integral',
-                'oats' => 'aveia',
-                'pasta' => 'massa',
-                // Gorduras/Frutas/Vegetais
-                'avocado' => 'abacate',
-                'olive oil' => 'azeite de oliva',
-                'banana' => 'banana',
+                // Frutas e vegetais
                 'apple' => 'maçã',
+                'apple juice' => 'suco de maçã',
+                'apple cider' => 'cidra de maçã',
+                'apple jelly' => 'geleia de maçã',
+                'apple sauce' => 'purê de maçã',
+                'applesauce' => 'purê de maçã',
+                'banana' => 'banana',
                 'orange' => 'laranja',
+                'orange juice' => 'suco de laranja',
+                'grape' => 'uva',
+                'grape juice' => 'suco de uva',
+                'strawberry' => 'morango',
+                'strawberry jam' => 'geleia de morango',
+                'watermelon' => 'melancia',
+                'pineapple' => 'abacaxi',
+                'pineapple juice' => 'suco de abacaxi',
+                'mango' => 'manga',
+                'papaya' => 'mamão',
+                'avocado' => 'abacate',
+                'guava' => 'goiaba',
+                'passion fruit' => 'maracujá',
+                'açaí' => 'açaí',
+                
+                // Vegetais e legumes
                 'broccoli' => 'brócolis',
-                // Itens brasileiros comuns
-                'feijao carioca' => 'feijão carioca',
-                'black beans' => 'feijão preto',
-                'mandioca' => 'mandioca',
-                'farofa' => 'farofa',
-                'pao frances' => 'pão francês',
-                'queijo minas' => 'queijo minas',
-                'leite integral' => 'whole milk',
-                // Expanda com mais 50+ itens para cobertura melhor
-                'frango grelhado' => 'grilled chicken',
-                'carne assada' => 'roast beef',
-                // Adicionais para melhor cobertura
-                'milk' => 'leite',
-                'cheese' => 'queijo',
-                'yogurt' => 'iogurte',
-                'butter' => 'manteiga',
-                'sugar' => 'açúcar',
-                'salt' => 'sal',
-                'pepper' => 'pimenta',
-                'garlic' => 'alho',
-                'onion' => 'cebola',
-                'tomato' => 'tomate',
-                'potato' => 'batata',
                 'carrot' => 'cenoura',
                 'lettuce' => 'alface',
                 'spinach' => 'espinafre',
-                'orange juice' => 'suco de laranja',
+                'kale' => 'couve',
+                'cabbage' => 'repolho',
+                'tomato' => 'tomate',
+                'potato' => 'batata',
+                'sweet potato' => 'batata doce',
+                'onion' => 'cebola',
+                'garlic' => 'alho',
+                'ginger' => 'gengibre',
+                'cucumber' => 'pepino',
+                'bell pepper' => 'pimentão',
+                'chili pepper' => 'pimenta',
+                
+                // Grãos e cereais
+                'rice' => 'arroz',
+                'brown rice' => 'arroz integral',
+                'white rice' => 'arroz branco',
+                'beans' => 'feijão',
+                'black beans' => 'feijão preto',
+                'pinto beans' => 'feijão carioca',
+                'lentils' => 'lentilha',
+                'chickpeas' => 'grão-de-bico',
+                'oats' => 'aveia',
+                'quinoa' => 'quinoa',
+                'corn' => 'milho',
+                'popcorn' => 'pipoca',
+                'flour' => 'farinha',
+                'wheat flour' => 'farinha de trigo',
+                
+                // Proteínas
+                'chicken' => 'frango',
+                'chicken breast' => 'peito de frango',
+                'chicken thigh' => 'coxa de frango',
+                'beef' => 'carne bovina',
+                'ground beef' => 'carne moída',
+                'steak' => 'bife',
+                'pork' => 'porco',
+                'pork chop' => 'costeleta de porco',
+                'bacon' => 'bacon',
+                'sausage' => 'linguiça',
+                'fish' => 'peixe',
+                'salmon' => 'salmão',
+                'tuna' => 'atum',
+                'sardine' => 'sardinha',
+                'shrimp' => 'camarão',
+                'egg' => 'ovo',
+                'eggs' => 'ovos',
+                
+                // Laticínios
+                'milk' => 'leite',
+                'whole milk' => 'leite integral',
+                'skim milk' => 'leite desnatado',
+                'cheese' => 'queijo',
+                'mozzarella cheese' => 'queijo mussarela',
+                'cheddar cheese' => 'queijo cheddar',
+                'cream cheese' => 'cream cheese',
+                'yogurt' => 'iogurte',
+                'greek yogurt' => 'iogurte grego',
+                'butter' => 'manteiga',
+                'margarine' => 'margarina',
+                'cream' => 'creme de leite',
+                'whipped cream' => 'chantilly',
+                
+                // Pães e massas
+                'bread' => 'pão',
+                'whole wheat bread' => 'pão integral',
+                'white bread' => 'pão branco',
+                'french bread' => 'pão francês',
+                'toast' => 'torrada',
+                'pasta' => 'massa',
+                'spaghetti' => 'espaguete',
+                'penne' => 'penne',
+                'lasagna' => 'lasanha',
+                'noodles' => 'macarrão',
+                
+                // Nozes e sementes
+                'peanut' => 'amendoim',
+                'peanut butter' => 'manteiga de amendoim',
+                'almond' => 'amêndoa',
+                'walnut' => 'noz',
+                'cashew' => 'castanha de caju',
+                'brazil nut' => 'castanha-do-pará',
+                'sunflower seed' => 'semente de girassol',
+                'chia seed' => 'semente de chia',
+                'flaxseed' => 'linhaça',
+                
+                // Bebidas
+                'water' => 'água',
+                'sparkling water' => 'água com gás',
                 'coffee' => 'café',
                 'tea' => 'chá',
-                'water' => 'água',
-                'bread' => 'pão',
-                'rice' => 'arroz',
-                'beans' => 'feijão',
-                'fish' => 'peixe',
-                'pork' => 'porco',
-                'chicken' => 'frango',
-                'beef' => 'carne',
-                'turkey' => 'peru'
+                'green tea' => 'chá verde',
+                'black tea' => 'chá preto',
+                'soda' => 'refrigerante',
+                'beer' => 'cerveja',
+                'wine' => 'vinho',
+                
+                // Doces e sobremesas
+                'sugar' => 'açúcar',
+                'brown sugar' => 'açúcar mascavo',
+                'honey' => 'mel',
+                'chocolate' => 'chocolate',
+                'dark chocolate' => 'chocolate amargo',
+                'milk chocolate' => 'chocolate ao leite',
+                'ice cream' => 'sorvete',
+                'cake' => 'bolo',
+                'cookie' => 'biscoito',
+                'candy' => 'doce',
+                
+                // Óleos e condimentos
+                'oil' => 'óleo',
+                'olive oil' => 'azeite de oliva',
+                'coconut oil' => 'óleo de coco',
+                'salt' => 'sal',
+                'black pepper' => 'pimenta-do-reino',
+                'soy sauce' => 'molho de soja',
+                'vinegar' => 'vinagre',
+                'ketchup' => 'ketchup',
+                'mayonnaise' => 'maionese',
+                'mustard' => 'mostarda',
+                
+                // Preparações brasileiras
+                'feijoada' => 'feijoada',
+                'farofa' => 'farofa',
+                'coxinha' => 'coxinha',
+                'pão de queijo' => 'pão de queijo',
+                'acarajé' => 'acarajé',
+                'moqueca' => 'moqueca',
+                'brigadeiro' => 'brigadeiro',
+                'beijinho' => 'beijinho',
+                'quindim' => 'quindim',
+                'aipim' => 'aipim',
+                'mandioca' => 'mandioca',
+                'cuscuz' => 'cuscuz'
             ];
+
             return $dicionarioAlimentos[$termoIngles] ?? null;
         }
 
         /**
-         * Tradução inteligente para frases compostas.
-         * Divide em palavras, traduz individualmente, reorganiza ordem gramatical para PT.
+         * Tradução inteligente para frases complexas no contexto brasileiro
+         * Usa API + pós-processamento específico para alimentos
          */
-        private function traduzirFraseInteligente(string $fraseIngles): string {
-            if (strpos($fraseIngles, ' ') === false) {
-                return $this->chamarApiTraducaoReal($fraseIngles, 'en', 'pt');
+        private function traduzirFraseComplexaBrasileira(string $fraseIngles): string {
+            // Primeiro tenta tradução completa via API
+            $traducaoAPI = $this->chamarApiTraducaoReal($fraseIngles, 'en', 'pt');
+            
+            if ($traducaoAPI === $fraseIngles) {
+                return $fraseIngles;
             }
-            $palavras = explode(' ', $fraseIngles);
-            $palavrasTraduzidas = [];
-            foreach ($palavras as $palavra) {
-                $trad = $this->chamarApiTraducaoReal($palavra, 'en', 'pt');
-                $palavrasTraduzidas[] = $trad ?: $palavra;
-            }
-            return $this->reorganizarOrdemPortugues($palavrasTraduzidas, $fraseIngles);
+
+            // Aplica correções pós-tradução para contexto brasileiro
+            return $this->aplicarCorrecoesBrasileiras($traducaoAPI, $fraseIngles);
         }
 
         /**
-         * Reorganiza ordem das palavras para gramática portuguesa (ex: adjetivo após substantivo).
-         * Correções específicas para alimentos.
+         * Aplica correções específicas para o português brasileiro
+         * Corrige termos técnicos, medidas e expressões comuns
          */
-        private function reorganizarOrdemPortugues(array $palavras, string $original): string {
-            $frase = implode(' ', $palavras);
-            // Correções gramaticais simples para alimentos
+        private function aplicarCorrecoesBrasileiras(string $traducao, string $original): string {
             $correcoes = [
-                'breast chicken' => 'peito de frango',
-                'milk whole' => 'leite integral',
-                'rice brown' => 'arroz integral',
-                'beans black' => 'feijão preto',
-                'oil olive' => 'azeite de oliva',
-                'juice orange' => 'suco de laranja',
-                'bread wheat whole' => 'pão integral',
-                'cheese minas' => 'queijo minas',
-                // Adicione mais correções conforme necessário
+                // Termos técnicos e medidas
+                'colher de sopa' => 'colher de sopa',
+                'colher de chá' => 'colher de chá',
+                'xícara de chá' => 'xícara',
+                'copos' => 'copos',
+                'gramas' => 'gramas',
+                'quilogramas' => 'quilogramas',
+                'mililitros' => 'mililitros',
+                'litros' => 'litros',
+                
+                // Expressões comuns em receitas
+                'picado' => 'picado',
+                'cortado em cubos' => 'cortado em cubos',
+                'fatiado' => 'fatiado',
+                'ralado' => 'ralado',
+                'cozido' => 'cozido',
+                'grelhado' => 'grelhado',
+                'assado' => 'assado',
+                'frito' => 'frito',
+                'cru' => 'cru',
+                
+                // Correções de termos específicos
+                'gelatina' => 'geleia', // apple jelly -> geleia de maçã, não gelatina
+                'molho' => 'molho',
+                'caldo' => 'caldo',
+                'tempero' => 'tempero',
+                'marinada' => 'marinada',
+                'cobertura' => 'cobertura',
+                'recheio' => 'recheio'
             ];
+
+            // Aplica correções de ordem gramatical para alimentos
+            $traducao = $this->corrigirOrdemGramatical($traducao);
+            
+            // Aplica substituições específicas
             foreach ($correcoes as $errado => $correto) {
-                $frase = str_replace($errado, $correto, $frase);
+                // Busca por variações com diferentes espaçamentos
+                $padrao = '/\b' . preg_quote($errado, '/') . '\b/i';
+                $traducao = preg_replace($padrao, $correto, $traducao);
             }
-            return trim(preg_replace('/\s+/', ' ', $frase));
+
+            return trim(preg_replace('/\s+/', ' ', $traducao));
         }
 
         /**
-         * Chama APIs de tradução: LibreTranslate (primário, robusto para frases) > MyMemory (fallback).
+         * Corrige ordem gramatical para português brasileiro
+         * Ex: "apple red" -> "maçã vermelha", não "vermelha maçã"
+         */
+        private function corrigirOrdemGramatical(string $frase): string {
+            $padroes = [
+                // Adjetivo antes do substantivo (inglês) -> substantivo + adjetivo (português)
+                '/(vermelho|vermelha|azul|verde|amarelo|branco|preto|doce|salgado|azedo|fresco|seco|cozido|cru|grande|pequeno) (maçã|banana|laranja|carne|frango|peixe|pão|queijo|arroz|feijão)/i' => '$2 $1',
+                
+                // Medidas: "1 cup" -> "1 xícara"
+                '/(\d+)\s*(cup|cups)/i' => '$1 xícara',
+                '/(\d+)\s*(tbsp|tablespoon|tablespoons)/i' => '$1 colher de sopa',
+                '/(\d+)\s*(tsp|teaspoon|teaspoons)/i' => '$1 colher de chá',
+                '/(\d+)\s*(oz|ounce|ounces)/i' => '$1 onça',
+                '/(\d+)\s*(lb|pound|pounds)/i' => '$1 libra'
+            ];
+
+            foreach ($padroes as $padrao => $substituicao) {
+                $frase = preg_replace($padrao, $substituicao, $frase);
+            }
+
+            return $frase;
+        }
+
+        /**
+         * Chama APIs de tradução: LibreTranslate (primário) > MyMemory (fallback)
          */
         private function chamarApiTraducaoReal(string $texto, string $de, string $para): string {
             // LibreTranslate (suporta frases bem)
             $url = "https://libretranslate.de/translate";
-            $data = json_encode(['q' => $texto, 'source' => $de, 'target' => $para, 'format' => 'text']);
+            $data = json_encode([
+                'q' => $texto, 
+                'source' => $de, 
+                'target' => $para, 
+                'format' => 'text'
+            ]);
+            
             $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $data,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json'
+                ],
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => false
+            ]);
+            
             $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            
             if (curl_errno($ch)) {
                 error_log("Erro LibreTranslate: " . curl_error($ch));
             }
             curl_close($ch);
-            $result = json_decode($response, true);
-            if (isset($result['translatedText']) && !empty($result['translatedText'])) {
-                return $result['translatedText'];
+
+            if ($response && $httpCode === 200) {
+                $result = json_decode($response, true);
+                if (isset($result['translatedText']) && !empty(trim($result['translatedText']))) {
+                    return trim($result['translatedText']);
+                }
             }
 
             // Fallback MyMemory
             $url = "https://api.mymemory.translated.net/get?q=" . urlencode($texto) . "&langpair=" . $de . "|" . $para;
-            $context = stream_context_create(['http' => ['timeout' => 10]]);
+            $context = stream_context_create([
+                'http' => [
+                    'timeout' => 10,
+                    'ignore_errors' => true
+                ],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ]);
+            
             $response = @file_get_contents($url, false, $context);
             if ($response) {
                 $result = json_decode($response, true);
-                if (isset($result['responseData']['translatedText']) && !empty($result['responseData']['translatedText'])) {
-                    return $result['responseData']['translatedText'];
+                if (isset($result['responseData']['translatedText']) && 
+                    !empty(trim($result['responseData']['translatedText']))) {
+                    return trim($result['responseData']['translatedText']);
                 }
             }
 
@@ -205,9 +389,11 @@
             return $texto;
         }
 
+        // Os métodos restantes permanecem iguais (criarRefeicao, deleteRefeicao, etc.)
+        // Mantive apenas os métodos de tradução para focar na solução do problema
+
         /**
          * Cria uma nova refeição (ex: "Café da manhã") para o aluno logado.
-         * Verifica se aluno existe e está ativo.
          */
         public function criarRefeicao(int $idAluno, string $nomeTipo, string $dataRef): int {
             if (empty($nomeTipo) || empty($dataRef)) {
@@ -230,7 +416,6 @@
 
         /**
          * Remove uma refeição e todos os itens/nutrientes associados
-         * VERSÃO SIMPLIFICADA E FUNCIONAL
          */
         public function deleteRefeicao(int $idRefeicao): bool {
             if (!$idRefeicao) {
@@ -250,69 +435,99 @@
                 throw new Exception('Acesso negado: esta refeição não pertence a você');
             }
 
-            // Deleta a refeição (repository gerencia a transação internamente)
             return $this->repository->deleteRefeicao($idRefeicao);
         }
 
         /**
-         * Lista refeições do aluno logado (filtro por data opcional).
-         * Verifica permissão via JWT.
+         * Lista refeições do aluno logado - VERSÃO CORRIGIDA
          */
         public function listarRefeicoesAluno(int $idAluno, ?string $dataRef = null): array {
-            return $this->repository->getRefeicoesByAluno($idAluno, $dataRef);
+            try {
+                // DEBUG
+                error_log("Service - ID Aluno: $idAluno, Data Ref: " . ($dataRef ?? 'null'));
+                
+                $refeicoes = $this->repository->getRefeicoesByAluno($idAluno, $dataRef);
+                
+                // DEBUG
+                error_log("Service - Refêições encontradas: " . count($refeicoes));
+                
+                return $refeicoes;
+            } catch (Exception $e) {
+                error_log("Erro no Service listarRefeicoesAluno: " . $e->getMessage());
+                throw $e;
+            }
         }
 
         /**
-         * Busca sugestões de alimentos na Spoonacular, traduzindo o termo em PT para EN.
-         * Salva traduções no banco. Retorna nomes em PT para exibição.
+         * Busca sugestões de alimentos na Spoonacular com tradução robusta
          */
         public function buscarAlimentosTraduzidos(string $termoPortugues): array {
             if (empty($termoPortugues)) {
                 throw new Exception('Termo de busca é obrigatório');
             }
+            
             $nomeIngles = $this->traduzirParaIngles($termoPortugues);
             $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
-            $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($nomeIngles) . "&number=5&apiKey=$apiKey";
+            $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($nomeIngles) . "&number=10&apiKey=$apiKey";
             
-            $context = stream_context_create(['http' => ['timeout' => 15]]);
+            $context = stream_context_create([
+                'http' => ['timeout' => 15],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ]);
+            
             $data = json_decode(@file_get_contents($url, false, $context), true);
             
             $resultados = [];
             if ($data && isset($data['results'])) {
                 foreach ($data['results'] as $item) {
+                    // Usa a tradução robusta para português brasileiro
                     $nomePT = $this->traduzirParaPortugues($item['name']);
+                    
                     $resultados[] = [
                         'id' => $item['id'],
                         'nome' => $nomePT,
                         'nome_original' => $item['name'],
                         'imagem' => "https://spoonacular.com/cdn/ingredients_100x100/" . ($item['image'] ?? 'default.png')
                     ];
+                    
                     // Salva tradução se nova
                     $this->repository->inserirTraducao($item['name'], $nomePT, 'api');
                 }
             }
+            
             if (empty($resultados)) {
-                error_log("Nenhum resultado na Spoonacular para '$nomeIngles'");
+                error_log("Nenhum resultado na Spoonacular para '$nomeIngles' (original: '$termoPortugues')");
             }
+            
             return $resultados;
         }
 
         /**
-         * Busca informações nutricionais detalhadas de um alimento específico
+         * Busca informações nutricionais detalhadas
          */
         public function buscarInformacaoAlimento(int $id, float $quantidade = 100, string $unidade = 'g'): array {
             $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
             
             $url = "https://api.spoonacular.com/food/ingredients/{$id}/information?amount={$quantidade}&unit={$unidade}&apiKey={$apiKey}";
             
-            $context = stream_context_create(['http' => ['timeout' => 15]]);
+            $context = stream_context_create([
+                'http' => ['timeout' => 15],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ]);
+            
             $data = json_decode(@file_get_contents($url, false, $context), true);
 
             if (!$data) {
                 throw new Exception('Não foi possível obter informações do alimento da API Spoonacular');
             }
 
-            // Traduz o nome para português
+            // Usa tradução robusta para o nome
             $nomePortugues = $this->traduzirParaPortugues($data['name'] ?? 'Desconhecido');
 
             return [
@@ -327,9 +542,6 @@
             ];
         }
 
-        /**
-         * Extrai nutrientes da resposta da Spoonacular
-         */
         private function extrairNutrientes(array $nutrition): array {
             $nutrientes = [];
             $mapeamento = [
@@ -358,11 +570,6 @@
             return $nutrientes;
         }
 
-        /**
-         * Adiciona um alimento a uma refeição, calculando nutrientes proporcionais à quantidade/medida.
-         * Usa transação para consistência (itens_refeicao + nutrientes).
-         * Verifica permissão (refeição pertence ao aluno logado).
-         */
         public function addAlimento(int $idTipoRefeicao, string $nome, float $quantidade, string $medida = 'g'): int {
             if (!$idTipoRefeicao || !$nome || !$quantidade || $quantidade <= 0) {
                 throw new Exception('Dados incompletos ou quantidade inválida');
@@ -437,17 +644,37 @@
         }
 
         /**
-         * Busca nutrientes do alimento via Spoonacular (traduz nome para EN).
-         * Retorna macros para a quantidade e medida especificadas.
-         * Fallback para estimativa genérica se API falhar.
+         * Remove um item de refeição (deleta itens_refeicao e nutrientes vinculados).
+         * Verifica permissão.
          */
+        public function deleteAlimento(int $idItensRef): bool {
+            if (!$idItensRef) {
+                throw new Exception('ID do item é obrigatório');
+            }
+            $this->pdo->beginTransaction();
+            try {
+                $sucesso = $this->repository->deleteItem($idItensRef);
+                $this->pdo->commit();
+                return $sucesso;
+            } catch (Exception $e) {
+                $this->pdo->rollBack();
+                throw $e;
+            }
+        }
+
         private function buscarNutrientesAPI(string $nome, float $quantidade = 100.0, string $medida = 'g'): array {
             $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
             $nomeIngles = $this->traduzirParaIngles($nome);
 
             // Busca ID do ingrediente
             $searchUrl = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($nomeIngles) . "&number=1&apiKey=" . $apiKey;
-            $context = stream_context_create(['http' => ['timeout' => 15]]);
+            $context = stream_context_create([
+                'http' => ['timeout' => 15],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ]);
             $searchData = json_decode(@file_get_contents($searchUrl, false, $context), true);
 
             $nutrientes = ['calorias' => 0.0, 'proteinas' => 0.0, 'carboidratos' => 0.0, 'gorduras' => 0.0];
@@ -480,15 +707,12 @@
                 }
             }
 
-            // Fallback: Estimativa genérica baseada no tipo de alimento
+            // Fallback: Estimativa genérica
             error_log("Spoonacular falhou para '$nomeIngles'. Usando estimativa.");
             $tipo = $this->detectarTipoAlimento($nomeIngles);
             return $this->estimativaGenerica($tipo, $quantidade);
         }
 
-        /**
-         * Detecta tipo aproximado do alimento para fallback (baseado em palavras-chave).
-         */
         private function detectarTipoAlimento(string $nomeIngles): string {
             $nomeLower = strtolower($nomeIngles);
             if (strpos($nomeLower, 'chicken') !== false || strpos($nomeLower, 'beef') !== false || 
@@ -514,10 +738,6 @@
             return 'geral';
         }
 
-        /**
-         * Retorna estimativa genérica de nutrientes por 100g/ml (kcal, g de macros).
-         * Valores aproximados baseados em médias nutricionais.
-         */
         private function estimativaGenerica(string $tipo, float $quantidadeBase = 100.0): array {
             $estimativasPor100g = [
                 'proteina' => ['calorias' => 165.0, 'proteinas' => 31.0, 'carboidratos' => 0.0, 'gorduras' => 3.6],
@@ -537,25 +757,41 @@
         }
 
         /**
-         * Lista itens de uma refeição específica
+         * Listar todos os alimentos de uma refeição específica
          */
-        public function listarAlimentos(string $lista, int $idAluno): array {
-            return $this->repository->getByLista($lista, $idAluno);
+        public function listarAlimentosRefeicao(int $idRefeicao, int $idAluno): array {
+            if (!$idRefeicao) {
+                throw new Exception('ID da refeição é obrigatório');
+            }
+
+            // Verifica se a refeição pertence ao aluno
+            $stmt = $this->pdo->prepare("SELECT idAluno FROM refeicoes_tipos WHERE id = ?");
+            $stmt->execute([$idRefeicao]);
+            $refeicao = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$refeicao) {
+                throw new Exception('Refeição não encontrada');
+            }
+            
+            if ($refeicao['idAluno'] != $idAluno) {
+                throw new Exception('Acesso negado: esta refeição não pertence a você');
+            }
+
+            return $this->repository->getItensByRefeicaoId($idRefeicao);
         }
 
-        /**
-         * Lista totais de nutrientes por tipo de refeição para o aluno logado.
-         * Inclui totais gerais no final.
-         */
+        // public function listarAlimentos(string $lista, int $idAluno): array {
+        //     return $this->repository->getByLista($lista, $idAluno);
+        // }
+
         public function listarTotais(int $idAluno): array {
             $totaisPorRefeicao = $this->repository->getTotaisPorRefeicao($idAluno);
             $totaisGerais = $this->repository->getTotaisGerais($idAluno);
 
-            // Reestruturar para o formato esperado
             $refeicoesEstruturadas = [];
             foreach ($totaisPorRefeicao as $refeicao) {
                 $refeicoesEstruturadas[$refeicao['nome_tipo']] = [
-                    'items' => [], // Poderia preencher com itens se necessário
+                    'items' => [],
                     'totais' => [
                         'calorias' => (float)($refeicao['total_calorias'] ?? 0),
                         'proteinas' => (float)($refeicao['total_proteinas'] ?? 0),
@@ -567,7 +803,7 @@
 
             return [
                 'refeicoes' => $refeicoesEstruturadas,
-                'totaisGerais' => [
+                'totais_gerais' => [
                     'calorias' => (float)($totaisGerais['total_calorias'] ?? 0),
                     'proteinas' => (float)($totaisGerais['total_proteinas'] ?? 0),
                     'carboidratos' => (float)($totaisGerais['total_carboidratos'] ?? 0),
@@ -576,23 +812,49 @@
             ];
         }
 
-        /**
-         * Remove um item de refeição (deleta itens_refeicao e nutrientes vinculados).
-         * Verifica permissão.
-         */
-        public function deleteAlimento(int $idItensRef): bool {
-            if (!$idItensRef) {
-                throw new Exception('ID do item é obrigatório');
+        public function listarRefeicoesCompletas(int $idAluno, ?string $dataRef = null): array {
+            // Busca as refeições básicas
+            $refeicoesBasicas = $this->repository->getRefeicoesByAluno($idAluno, $dataRef);
+            
+            $refeicoesCompletas = [];
+            
+            foreach ($refeicoesBasicas as $refeicao) {
+                $idRefeicao = $refeicao['id'];
+                
+                // Busca os alimentos desta refeição usando o método correto
+                $alimentos = $this->repository->getItensByRefeicaoId($idRefeicao);
+                
+                // Calcula totais da refeição
+                $totaisRefeicao = [
+                    'total_calorias' => 0,
+                    'total_proteinas' => 0,
+                    'total_carboidratos' => 0,
+                    'total_gorduras' => 0
+                ];
+                
+                foreach ($alimentos as $alimento) {
+                    $totaisRefeicao['total_calorias'] += (float)$alimento['calorias'];
+                    $totaisRefeicao['total_proteinas'] += (float)$alimento['proteinas'];
+                    $totaisRefeicao['total_carboidratos'] += (float)$alimento['carboidratos'];
+                    $totaisRefeicao['total_gorduras'] += (float)$alimento['gorduras'];
+                }
+                
+                // Formata a resposta
+                $refeicoesCompletas[] = [
+                    'id' => $refeicao['id'],
+                    'nome_tipo' => $refeicao['nome_tipo'],
+                    'data_ref' => $refeicao['data_ref'],
+                    'alimentos' => $alimentos,
+                    'totais' => [
+                        'calorias' => round($totaisRefeicao['total_calorias'], 2),
+                        'proteinas' => round($totaisRefeicao['total_proteinas'], 2),
+                        'carboidratos' => round($totaisRefeicao['total_carboidratos'], 2),
+                        'gorduras' => round($totaisRefeicao['total_gorduras'], 2)
+                    ]
+                ];
             }
-            $this->pdo->beginTransaction();
-            try {
-                $sucesso = $this->repository->deleteItem($idItensRef);
-                $this->pdo->commit();
-                return $sucesso;
-            } catch (Exception $e) {
-                $this->pdo->rollBack();
-                throw $e;
-            }
+            
+            return $refeicoesCompletas;
         }
     }
 

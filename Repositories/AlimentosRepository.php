@@ -7,23 +7,40 @@
             $this->pdo = $pdo;
         }
 
-        // Métodos de tradução
+        // Métodos de tradução - ATUALIZADOS para a estrutura real da tabela
         public function getTraducaoIngles(string $termoPortugues): ?string {
-            $stmt = $this->pdo->prepare("SELECT termo_ingles FROM traducoes_alimentos WHERE termo_portugues = ? LIMIT 1");
+            $stmt = $this->pdo->prepare("
+                SELECT nome_traduzido 
+                FROM traducoes_alimentos 
+                WHERE nome_original = ? AND idioma_original = 'pt' AND idioma_traduzido = 'en' 
+                LIMIT 1
+            ");
             $stmt->execute([$termoPortugues]);
             return $stmt->fetchColumn() ?: null;
         }
 
         public function getTraducaoPortugues(string $termoIngles): ?string {
-            $stmt = $this->pdo->prepare("SELECT termo_portugues FROM traducoes_alimentos WHERE termo_ingles = ? LIMIT 1");
+            $stmt = $this->pdo->prepare("
+                SELECT nome_traduzido 
+                FROM traducoes_alimentos 
+                WHERE nome_original = ? AND idioma_original = 'en' AND idioma_traduzido = 'pt' 
+                LIMIT 1
+            ");
             $stmt->execute([$termoIngles]);
             return $stmt->fetchColumn() ?: null;
         }
 
-        public function inserirTraducao(string $termoIngles, string $termoPortugues, string $fonte = 'dicionario'): bool {
+        public function inserirTraducao(string $termoIngles, string $termoPortugues, string $fonte = 'api'): bool {
             try {
-                $stmt = $this->pdo->prepare("INSERT INTO traducoes_alimentos (termo_ingles, termo_portugues, fonte) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE termo_portugues = VALUES(termo_portugues), fonte = VALUES(fonte)");
-                return $stmt->execute([$termoIngles, $termoPortugues, $fonte]);
+                $stmt = $this->pdo->prepare("
+                    INSERT INTO traducoes_alimentos 
+                    (nome_original, nome_traduzido, idioma_original, idioma_traduzido) 
+                    VALUES (?, ?, 'en', 'pt') 
+                    ON DUPLICATE KEY UPDATE 
+                    nome_traduzido = VALUES(nome_traduzido),
+                    data_atualizacao = CURRENT_TIMESTAMP
+                ");
+                return $stmt->execute([$termoIngles, $termoPortugues]);
             } catch (PDOException $e) {
                 error_log("Erro ao inserir tradução: " . $e->getMessage());
                 return false;
@@ -80,7 +97,7 @@
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        // Get by lista com filtro - CORRIGIDO: Adicionado COALESCE para valores nulos
+        // Get by lista com filtro
         public function getByLista(string $lista, ?int $idAluno = null): array {
             $sql = "
                 SELECT 
@@ -125,7 +142,7 @@
             return $stmt->execute([$quantidade, $medida, $id]);
         }
 
-        // Update nutrientes - CORRIGIDO: Adicionado tratamento para inserção se não existir
+        // Update nutrientes
         public function updateNutrientes(int $id, array $nutrientes, string $medida = 'g'): bool {
             // Primeiro verifica se existe
             $stmt = $this->pdo->prepare("SELECT alimento_id FROM nutrientes WHERE alimento_id = ?");
@@ -179,7 +196,7 @@
             return $stmt->execute([$id]);
         }
 
-        // Listar totais por refeição - CORRIGIDO: Adicionado COALESCE e filtro por data atual
+        // Listar totais por refeição
         public function getTotaisPorRefeicao(?int $idAluno = null): array {
             $sql = "
                 SELECT 
@@ -204,7 +221,7 @@
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        // Totais gerais - CORRIGIDO: Adicionado COALESCE e filtro por data atual
+        // Totais gerais
         public function getTotaisGerais(?int $idAluno = null): array {
             $sql = "
                 SELECT 
@@ -234,7 +251,7 @@
             ];
         }
 
-        // NOVO MÉTODO: Buscar refeição por ID (para validações)
+        // Buscar refeição por ID (para validações)
         public function getRefeicaoById(int $idRefeicao): ?array {
             $stmt = $this->pdo->prepare("SELECT * FROM refeicoes_tipos WHERE id = ?");
             $stmt->execute([$idRefeicao]);
@@ -242,14 +259,14 @@
             return $result ?: null;
         }
 
-        // NOVO MÉTODO: Verificar se refeição pertence ao aluno
+        // Verificar se refeição pertence ao aluno
         public function refeicaoPertenceAoAluno(int $idRefeicao, int $idAluno): bool {
             $stmt = $this->pdo->prepare("SELECT id FROM refeicoes_tipos WHERE id = ? AND idAluno = ?");
             $stmt->execute([$idRefeicao, $idAluno]);
             return (bool) $stmt->fetch();
         }
 
-        // NOVO MÉTODO: Listar itens por ID da refeição (alternativo ao getByLista)
+        // Listar itens de uma refeição específica
         public function getItensByRefeicaoId(int $idRefeicao): array {
             $sql = "
                 SELECT 
@@ -261,8 +278,11 @@
                     COALESCE(n.proteinas, 0) as proteinas,
                     COALESCE(n.carboidratos, 0) as carboidratos,
                     COALESCE(n.gorduras, 0) as gorduras,
-                    COALESCE(n.medida, ir.medida) as medida_nutriente
+                    COALESCE(n.medida, ir.medida) as medida_nutriente,
+                    rt.nome_tipo,
+                    rt.idAluno
                 FROM itens_refeicao ir
+                INNER JOIN refeicoes_tipos rt ON ir.id_tipo_refeicao = rt.id
                 LEFT JOIN nutrientes n ON ir.idItensRef = n.alimento_id
                 WHERE ir.id_tipo_refeicao = ?
                 ORDER BY ir.idItensRef ASC
