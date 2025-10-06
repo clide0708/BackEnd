@@ -149,4 +149,44 @@ class PerfilService
 
         return ['success' => true, 'data' => $usuario];
     }
+
+    public function atualizarPerfil($data)
+    {
+        $email = $data['email'];
+        $repo = new PerfilRepository();
+
+        $usuario = $repo->findByEmail($email);
+
+        if (!$usuario) {
+            return ['success' => false, 'error' => 'Usuário não encontrado'];
+        }
+
+        $tipo = $usuario['tipo'];
+
+        if ($tipo === 'alunos') {
+            $campos = [
+                'altura' => $data['altura'] ?? null,
+                'idade' => $data['idade'] ?? null,
+                'genero' => $data['genero'] ?? null,
+                'treinoTipo' => $data['treinoTipo'] ?? null,
+                'meta' => $data['meta'] ?? null,
+                'foto_perfil' => $data['foto_perfil'] ?? null,
+                'peso' => $data['peso'] ?? null,
+            ];
+        } else {
+            $campos = [
+                'idade' => $data['idade'] ?? null,
+                'genero' => $data['genero'] ?? null,
+                'foto_perfil' => $data['foto_perfil'] ?? null,
+            ];
+        }
+
+        $resultado = $repo->updatePerfil($tipo, $email, $campos);
+
+        if ($resultado) {
+            return ['success' => true, 'message' => 'Perfil atualizado com sucesso'];
+        } else {
+            return ['success' => false, 'error' => 'Erro ao atualizar perfil'];
+        }
+    }
 }

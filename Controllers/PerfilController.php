@@ -65,8 +65,6 @@ class PerfilController
             return;
         }
 
-        // Um personal só pode ver o próprio perfil
-        // Um dev/academia pode ver qualquer perfil de personal
         if ($this->tipoUsuarioLogado === 'personal' && $this->idUsuarioLogado != $idPersonal) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Acesso negado. Você só pode ver seu próprio perfil.']);
@@ -423,5 +421,38 @@ class PerfilController
         }
 
         echo json_encode($result);
+    }
+
+    public function atualizarPerfil()
+    {
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($data['email'])) {
+            echo json_encode(['success' => false, 'error' => 'Email é obrigatório']);
+            return;
+        }
+
+        $perfilService = new PerfilService();
+        $resultado = $perfilService->atualizarPerfil($data);
+
+        echo json_encode($resultado);
+    }
+
+    public function getPersonalPorId($id)
+    {
+        $repo = new PerfilRepository();
+        $personal = $repo->findById($id);
+
+        if ($personal) {
+            echo json_encode([
+                'success' => true,
+                'data' => $personal
+            ]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Personal não encontrado'
+            ]);
+        }
     }
 }

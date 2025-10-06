@@ -335,6 +335,12 @@ $routes = [
         'controller' => 'PerfilController',
         'method' => 'putPerfilAluno'
     ],
+
+    'perfil/personalNM/(\d+)' => [
+        'controller' => 'PerfilController', // ou PersonalController
+        'method' => 'getPersonalPorId'
+    ],
+
     'perfil/personal/(\d+)' => [
         'controller' => 'PerfilController',
         'method' => 'getPerfilPersonal'

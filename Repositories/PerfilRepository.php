@@ -354,4 +354,41 @@ class PerfilRepository
         // se não achou em nenhuma
         return null;
     }
+
+    public function updatePerfil($tipo, $email, $campos)
+    {
+        $table = $tipo === 'alunos' ? 'alunos' : 'personais';
+
+        // gera os sets dinamicamente
+        $setParts = [];
+        foreach ($campos as $campo => $valor) {
+            if ($valor !== null) {
+                $setParts[] = "$campo = :$campo";
+            }
+        }
+
+        if (empty($setParts)) {
+            return false; // nada pra atualizar
+        }
+
+        $query = "UPDATE $table SET " . implode(', ', $setParts) . " WHERE email = :email";
+
+        $stmt = $this->conn->prepare($query);
+        foreach ($campos as $campo => $valor) {
+            if ($valor !== null) {
+                $stmt->bindValue(":$campo", $valor);
+            }
+        }
+        $stmt->bindValue(":email", $email);
+        return $stmt->execute();
+    }
+
+    public function findById($id)
+    {
+        $query = "SELECT idPersonal, nome, email FROM personal WHERE idPersonal = :id LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 }
