@@ -803,7 +803,7 @@
 
             return [
                 'refeicoes' => $refeicoesEstruturadas,
-                'totais_gerais' => [
+                'totaisGerais' => [ // ← CORRIGIDO: mudar 'totais_gerais' para 'totaisGerais'
                     'calorias' => (float)($totaisGerais['total_calorias'] ?? 0),
                     'proteinas' => (float)($totaisGerais['total_proteinas'] ?? 0),
                     'carboidratos' => (float)($totaisGerais['total_carboidratos'] ?? 0),
