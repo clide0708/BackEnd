@@ -43,6 +43,19 @@ class PerfilService
     // Métodos POST/PUT
     public function createOrUpdatePerfilAluno($idAluno, $data)
     {
+        // Validações para peso e altura
+        if (isset($data['peso'])) {
+            $peso = floatval($data['peso']);
+            if ($peso < 30 || $peso > 300) {
+                return ['success' => false, 'error' => 'Peso deve estar entre 30kg e 300kg.'];
+            }
+        }
+        if (isset($data['altura'])) {
+            $altura = floatval($data['altura']);
+            if ($altura < 100 || $altura > 250) {
+                return ['success' => false, 'error' => 'Altura deve estar entre 100cm e 250cm.'];
+            }
+        }
         if (isset($data['altura']) && !is_numeric($data['altura'])) {
             return ['success' => false, 'error' => 'Altura deve ser um número.'];
         }
