@@ -138,7 +138,6 @@
             $idPersonalToken = $usuario['tipo'] === 'personal' ? $usuario['sub'] : null;
             $emailUsuario = strtolower(trim($usuario['email']));
 
-
             // Verificar se treino existe e pertence ao usuário (aluno ou personal)
             $stmt = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
             $stmt->execute([$idTreino]);
@@ -174,7 +173,7 @@
 
             try {
                 $now = date('Y-m-d H:i:s');
-                $stmt = $this->db->prepare("INSERT INTO treino_exercicio (idTreino, idExercicio, idExercAdaptado, data_criacao, data_ultima_modificacao, series, repeticoes, carga, ordem, observacoes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt = $this->db->prepare("INSERT INTO treino_exercicio (idTreino, idExercicio, idExercAdaptado, data_criacao, data_ultima_modificacao, series, repeticoes, carga, descanso, ordem, observacoes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $idTreino,
                     $exercicioData['idExercicio'] ?? null,
@@ -184,6 +183,7 @@
                     $exercicioData['series'] ?? null,
                     $exercicioData['repeticoes'] ?? null,
                     $exercicioData['carga'] ?? null,
+                    $exercicioData['descanso'] ?? null, // Campo descanso adicionado
                     $exercicioData['ordem'] ?? null,
                     $exercicioData['observacoes'] ?? null
                 ]);
@@ -282,13 +282,14 @@
             $series = $data['series'] ?? $exercicio['series'];
             $repeticoes = $data['repeticoes'] ?? $exercicio['repeticoes'];
             $carga = $data['carga'] ?? $exercicio['carga'];
+            $descanso = $data['descanso'] ?? $exercicio['descanso']; // Campo descanso adicionado
             $ordem = $data['ordem'] ?? $exercicio['ordem'];
             $observacoes = $data['observacoes'] ?? $exercicio['observacoes'];
 
             try {
                 $now = date('Y-m-d H:i:s');
-                $stmt = $this->db->prepare("UPDATE treino_exercicio SET series = ?, repeticoes = ?, carga = ?, ordem = ?, observacoes = ?, data_ultima_modificacao = ? WHERE idTreino_Exercicio = ?");
-                $stmt->execute([$series, $repeticoes, $carga, $ordem, $observacoes, $now, $idTreinoExercicio]);
+                $stmt = $this->db->prepare("UPDATE treino_exercicio SET series = ?, repeticoes = ?, carga = ?, descanso = ?, ordem = ?, observacoes = ?, data_ultima_modificacao = ? WHERE idTreino_Exercicio = ?");
+                $stmt->execute([$series, $repeticoes, $carga, $descanso, $ordem, $observacoes, $now, $idTreinoExercicio]);
 
                 $stmtUpdateTreino = $this->db->prepare("UPDATE treinos SET data_ultima_modificacao = ? WHERE idTreino = ?");
                 $stmtUpdateTreino->execute([$now, $exercicio['idTreino']]);
