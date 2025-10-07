@@ -464,7 +464,7 @@
             }
             
             $nomeIngles = $this->traduzirParaIngles($termoPortugues);
-            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '1b595354b7fa490e84c1d3942f6b04c5';
             $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($nomeIngles) . "&number=10&apiKey=$apiKey";
             
             $context = stream_context_create([
@@ -506,7 +506,7 @@
          * Busca informações nutricionais detalhadas
          */
         public function buscarInformacaoAlimento(int $id, float $quantidade = 100, string $unidade = 'g'): array {
-            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '1b595354b7fa490e84c1d3942f6b04c5';
             
             $url = "https://api.spoonacular.com/food/ingredients/{$id}/information?amount={$quantidade}&unit={$unidade}&apiKey={$apiKey}";
             
@@ -660,7 +660,7 @@
         }
 
         private function buscarNutrientesAPI(string $nome, float $quantidade = 100.0, string $medida = 'g'): array {
-            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '1b595354b7fa490e84c1d3942f6b04c5';
             $nomeIngles = $this->traduzirParaIngles($nome);
 
             // Busca ID do ingrediente

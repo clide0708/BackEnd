@@ -512,7 +512,7 @@
         }
 
         private function testarAPIDiretamente(string $termo): array {
-            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '1b595354b7fa490e84c1d3942f6b04c5';
             $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($termo) . "&number=5&apiKey=$apiKey";
             
             $context = stream_context_create([
