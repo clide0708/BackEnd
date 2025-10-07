@@ -293,6 +293,10 @@ $routes = [
     'controller' => 'AlimentosController',
     'method' => 'criarRefeicao'
     ],
+    'alimentos/remover-refeicao' => [
+    'controller' => 'AlimentosController',
+    'method' => 'removerRefeicao'
+    ],
     'alimentos/refeicoes-hoje' => [
         'controller' => 'AlimentosController',
         'method' => 'listarRefeicoesHoje'
