@@ -275,6 +275,11 @@ $routes = [
         'method' => 'listarTotais'
     ],
 
+    'alimentos/diagnosticar-busca' => [
+    'controller' => 'AlimentosController',
+    'method' => 'diagnosticarBusca'
+    ],
+
     // Rotas para Refeições
     'alimentos/listar-refeicoes' => [
     'controller' => 'AlimentosController',

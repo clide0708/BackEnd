@@ -389,9 +389,6 @@
             return $texto;
         }
 
-        // Os métodos restantes permanecem iguais (criarRefeicao, deleteRefeicao, etc.)
-        // Mantive apenas os métodos de tradução para focar na solução do problema
-
         /**
          * Cria uma nova refeição (ex: "Café da manhã") para o aluno logado.
          */

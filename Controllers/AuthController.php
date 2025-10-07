@@ -15,6 +15,8 @@
         public function login($data)
         {
             try {
+                header("Access-Control-Allow-Credentials: true");
+                
                 if (!isset($data['email']) || !isset($data['senha'])) {
                     http_response_code(400 );
                     echo json_encode(['success' => false, 'error' => 'Email e senha são obrigatórios']);

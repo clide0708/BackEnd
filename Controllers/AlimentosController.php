@@ -35,14 +35,36 @@
                 $data = json_decode(file_get_contents('php://input'), true);
                 $nomeTipo = $data['nome_tipo'] ?? '';
                 $dataRef = $data['data_ref'] ?? date('Y-m-d H:i:s');
+                // $dataRef = date('Y-m-d H:i:s');
+
+                // DEBUG
+                error_log("=== DEBUG CRIAR REFEICAO ===");
+                error_log("ID Aluno: " . $this->idAluno);
+                error_log("Nome Tipo: " . $nomeTipo);
+                error_log("Data Recebida: " . $dataRef);
+                error_log("Data Servidor: " . date('Y-m-d H:i:s'));
+                error_log("========================");
 
                 if (empty($nomeTipo)) {
                     throw new Exception('Nome do tipo de refeição é obrigatório (ex: Café da manhã)');
                 }
 
                 $idRefeicao = $this->service->criarRefeicao($this->idAluno, $nomeTipo, $dataRef);
-                echo json_encode(['success' => true, 'id_refeicao' => $idRefeicao, 'message' => 'Refeição criada com sucesso']);
+
+                // DEBUG
+                error_log("Refeição criada com ID: " . $idRefeicao);
+
+                echo json_encode([
+                    'success' => true, 
+                    'id_refeicao' => $idRefeicao, 
+                    'message' => 'Refeição criada com sucesso',
+                    'debug' => [
+                        'data_recebida' => $dataRef,
+                        'data_servidor' => date('Y-m-d H:i:s')
+                    ]
+                ]);
             } catch (Exception $e) {
+                error_log("ERRO ao criar refeição: " . $e->getMessage());
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
@@ -131,6 +153,43 @@
             }
         }
 
+        public function listarRefeicoesHoje() {
+            header('Content-Type: application/json');
+            try {
+                $dataRef = date('Y-m-d'); // Apenas data de hoje
+                
+                // DEBUG
+                error_log("=== LISTAR REFEICOES HOJE ===");
+                error_log("ID Aluno: " . $this->idAluno);
+                error_log("Data Ref: " . $dataRef);
+
+                // Busca refeições do dia atual
+                $refeicoes = $this->service->listarRefeicoesCompletas($this->idAluno, $dataRef);
+                
+                // DEBUG
+                error_log("Refeições encontradas: " . count($refeicoes));
+                foreach ($refeicoes as $ref) {
+                    error_log(" - " . $ref['nome_tipo'] . " (ID: " . $ref['id'] . ")");
+                }
+                error_log("============================");
+                
+                echo json_encode([
+                    'success' => true, 
+                    'refeicoes' => $refeicoes,
+                    'data_ref' => $dataRef,
+                    'total_refeicoes' => count($refeicoes),
+                    'debug' => [
+                        'id_aluno' => $this->idAluno,
+                        'data_consulta' => $dataRef
+                    ]
+                ]);
+            } catch (Exception $e) {
+                error_log("ERRO em listarRefeicoesHoje: " . $e->getMessage());
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
         // private function calcularTotaisRefeicao(array $alimentos): array {
         //     $totais = ['calorias' => 0, 'proteinas' => 0, 'carboidratos' => 0, 'gorduras' => 0];
             
@@ -149,22 +208,55 @@
         //     ];
         // }
 
-        // Buscar alimentos com tradução
+        //Buscar alimentos com tradução
         public function buscarAlimentos()
         {
-            header('Content-Type: application/json');
+            header('Content-Type: application/json; charset=utf-8');
             try {
                 $termo = $_GET['nome'] ?? '';
+                
+                // // DECODIFICA o termo para tratar caracteres especiais
+                // $termo = urldecode($termo);
+                // $termo = trim($termo);
+                
                 if (!$termo) {
                     throw new Exception('Termo de busca não informado');
                 }
+                
+                error_log("🔍 Buscando alimentos para: " . $termo);
+                
                 $resultados = $this->service->buscarAlimentosTraduzidos($termo);
-                echo json_encode(['success' => true, 'resultados' => $resultados]);
+                
+                // Garante que a resposta está em UTF-8
+                echo json_encode([
+                    'success' => true, 
+                    'resultados' => $resultados
+                ], JSON_UNESCAPED_UNICODE);
+                
             } catch (Exception $e) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => $e->getMessage()
+                ], JSON_UNESCAPED_UNICODE);
             }
         }
+
+        // public function buscarAlimentos()
+        // {
+        //     header('Content-Type: application/json');
+        //     try {
+        //         $termo = $_GET['nome'] ?? '';
+        //         if (!$termo) {
+        //             throw new Exception('Termo de busca não informado');
+        //         }
+        //         $resultados = $this->service->buscarAlimentosTraduzidos($termo);
+        //         echo json_encode(['success' => true, 'resultados' => $resultados]);
+        //     } catch (Exception $e) {
+        //         http_response_code(400);
+        //         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        //     }
+        // }
 
         // Informações detalhadas de alimento
         public function buscarInformacaoAlimento()
@@ -399,20 +491,45 @@
             }
         }
 
-        // private function queryDiretaItensRefeicao(int $idRefeicao): array {
-        //     $pdo = DB::connectDB();
-        //     $stmt = $pdo->prepare("SELECT * FROM itens_refeicao WHERE id_tipo_refeicao = ?");
-        //     $stmt->execute([$idRefeicao]);
-        //     return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        // }
+        public function diagnosticarBusca() {
+            header('Content-Type: application/json');
+            try {
+                $termo = $_GET['nome'] ?? 'maçã';
+                
+                // Diagnóstico passo a passo
+                $diagnostico = [
+                    'termo_original' => $termo,
+                    'traducao_ingles' => $this->service->traduzirParaIngles($termo),
+                    'api_key' => $_ENV['SPOONACULAR_API_KEY'] ?? 'Não encontrada',
+                    'teste_api_direto' => $this->testarAPIDiretamente($termo)
+                ];
+                
+                echo json_encode(['success' => true, 'diagnostico' => $diagnostico]);
+            } catch (Exception $e) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
 
-        // private function countItensRefeicao(int $idRefeicao): int {
-        //     $pdo = DB::connectDB();
-        //     $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM itens_refeicao WHERE id_tipo_refeicao = ?");
-        //     $stmt->execute([$idRefeicao]);
-        //     $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        //     return (int)($result['total'] ?? 0);
-        // }
+        private function testarAPIDiretamente(string $termo): array {
+            $apiKey = $_ENV['SPOONACULAR_API_KEY'] ?? '22d63ed8891245009cfa9acb18ec29ac';
+            $url = "https://api.spoonacular.com/food/ingredients/search?query=" . urlencode($termo) . "&number=5&apiKey=$apiKey";
+            
+            $context = stream_context_create([
+                'http' => ['timeout' => 15],
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            $data = $response ? json_decode($response, true) : null;
+            
+            return [
+                'url_chamada' => $url,
+                'resposta_bruta' => $response ? substr($response, 0, 500) : 'NULL',
+                'dados_decodificados' => $data,
+                'http_status' => $http_response_header[0] ?? 'Desconhecido'
+            ];
+        }
 
     }
 
