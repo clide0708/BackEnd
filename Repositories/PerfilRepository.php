@@ -311,7 +311,7 @@ class PerfilRepository
 
     public function getAlunosDoPersonal($idPersonal)
     {
-        $query = "SELECT idAluno, nome, email, status_vinculo FROM alunos WHERE idPersonal = :idPersonal AND status_conta = 'Ativa'";
+        $query = "SELECT idAluno, nome, email, status_vinculo, foto_perfil FROM alunos WHERE idPersonal = :idPersonal AND status_conta = 'Ativa'";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(":idPersonal", $idPersonal);
         $stmt->execute();
