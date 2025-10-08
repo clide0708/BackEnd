@@ -287,26 +287,26 @@ $routes = [
     ],
 
     'alimentos/diagnosticar-busca' => [
-    'controller' => 'AlimentosController',
-    'method' => 'diagnosticarBusca'
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarBusca'
     ],
 
     // Rotas para Refeições
     'alimentos/listar-refeicoes' => [
-    'controller' => 'AlimentosController',
-    'method' => 'listarRefeicoes'
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoes'
     ],
     'alimentos/listar-refeicoes-simples' => [
-    'controller' => 'AlimentosController',
-    'method' => 'listarRefeicoesSimples'
+        'controller' => 'AlimentosController',
+        'method' => 'listarRefeicoesSimples'
     ],
     'alimentos/criar-refeicao' => [
-    'controller' => 'AlimentosController',
-    'method' => 'criarRefeicao'
+        'controller' => 'AlimentosController',
+        'method' => 'criarRefeicao'
     ],
     'alimentos/remover-refeicao' => [
-    'controller' => 'AlimentosController',
-    'method' => 'removerRefeicao'
+        'controller' => 'AlimentosController',
+        'method' => 'removerRefeicao'
     ],
     'alimentos/refeicoes-hoje' => [
         'controller' => 'AlimentosController',
@@ -321,17 +321,17 @@ $routes = [
         'method' => 'listarAlimentosRefeicao'
     ],
     'alimentos/refeicao/alimentos' => [
-    'controller' => 'AlimentosController',
-    'method' => 'listarAlimentosRefeicao'
+        'controller' => 'AlimentosController',
+        'method' => 'listarAlimentosRefeicao'
     ],
 
     'alimentos/diagnosticar' => [
-    'controller' => 'AlimentosController',
-    'method' => 'diagnosticarRefeicoes'
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarRefeicoes'
     ],
     'alimentos/diagnosticar-alimentos' => [
-    'controller' => 'AlimentosController',
-    'method' => 'diagnosticarAlimentos'
+        'controller' => 'AlimentosController',
+        'method' => 'diagnosticarAlimentos'
     ],
 
     // Rota para testar conexão
@@ -345,13 +345,9 @@ $routes = [
         'controller' => 'ConvitesController',
         'method' => 'criarConvite'
     ],
-    'convites/([^/]+)' => [
-        'controller' => 'ConvitesController',
-        'method' => 'getConvites'
-    ],
-    'convites/email/([^/]+)' => [
-    'controller' => 'ConvitesController', 
-    'method' => 'getConvitesByEmail'
+    'convites/email/(.+)' => [
+        'controller' => 'ConvitesController', 
+        'method' => 'getConvitesByEmail'
     ],
     'convites/(\d+)/aceitar' => [
         'controller' => 'ConvitesController',
@@ -360,6 +356,10 @@ $routes = [
     'convites/(\d+)/negar' => [
         'controller' => 'ConvitesController',
         'method' => 'negarConvite'
+    ],
+    'convites/([^/]+)' => [
+        'controller' => 'ConvitesController',
+        'method' => 'getConvites'
     ],
 
     // Rotas para Recuperação de Senha
@@ -554,6 +554,7 @@ function dispatch($path, $routes, $controller_paths, $method_http)
         'alimentos/buscar',
         'alimentos/informacao',
         'alimentos/testar-traducao',
+        'convites/email/([^/]+)',
         'convites/([a-zA-Z0-9]{64})',
         'perfil/aluno/(\d+)',
         'perfil/personal/(\d+)',
