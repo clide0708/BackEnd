@@ -243,10 +243,13 @@ class ConvitesController
     /**
      * Busca convites por email do aluno
      */
-    public function getConvitesByEmail($email)
+    public function getConvitesByEmail($emailEncoded)
     {
         header('Content-Type: application/json');
+        
+        // ✅ CORREÇÃO: usar o parâmetro correto
         $email = urldecode($emailEncoded);
+        
         try {
             $stmt = $this->db->prepare("
                 SELECT 
