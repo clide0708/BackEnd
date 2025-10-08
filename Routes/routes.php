@@ -6,6 +6,17 @@ require_once __DIR__ . '/../Config/jwt.config.php';
 // Define as rotas do sistema
 $routes = [
 
+    // Rota para raiz (URL vazia)
+    '' =>[
+        'controller' => 'ConfigController',
+        'method' => 'bemVindo'
+    ],
+    //Rota Padrão
+    '/' =>[
+        'controller' => 'ConfigController',
+        'method' => 'bemVindo'
+    ],
+
     // Rotas para Cadastro
     'cadastro/aluno' => [
         'controller' => 'CadastroController',
@@ -522,6 +533,8 @@ function dispatch($path, $routes, $controller_paths, $method_http)
 
     // Rotas públicas que não precisam de autenticação
     $rotasPublicas = [
+        '',
+        '/',
         'auth/login',
         'auth/verificar-token',
         'auth/logout',
