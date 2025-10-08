@@ -246,6 +246,7 @@ class ConvitesController
     public function getConvitesByEmail($email)
     {
         header('Content-Type: application/json');
+        $email = urldecode($emailEncoded);
         try {
             $stmt = $this->db->prepare("
                 SELECT 
