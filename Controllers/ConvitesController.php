@@ -119,163 +119,36 @@ class ConvitesController
      * Acessa o convite via link (Aluno visualiza).
      * Retorna detalhes para o frontend mostrar opções aceitar/negar.
      */
-    public function getConvites($parametro)
+    public function getConvites($emailAluno)
     {
         header('Content-Type: application/json');
         try {
-            // Determina se o parâmetro é email ou token
-            if (filter_var($parametro, FILTER_VALIDATE_EMAIL)) {
-                // É um email - busca por email do aluno
-                $stmt = $this->db->prepare("
-                    SELECT 
-                        c.idConvite,
-                        c.status,
-                        c.data_criacao,
-                        p.nome AS nomePersonal,
-                        p.email AS emailPersonal,
-                        a.nome AS nomeAluno,
-                        a.email AS emailAluno,
-                        a.idAluno,
-                        p.idPersonal
-                    FROM convites c
-                    JOIN personal p ON c.idPersonal = p.idPersonal
-                    LEFT JOIN alunos a ON c.idAluno = a.idAluno
-                    WHERE a.email = ? AND c.status = 'pendente'
-                    ORDER BY c.data_criacao DESC
-                ");
-                $stmt->execute([$parametro]);
-            } else {
-                // É um token - busca por token
-                $stmt = $this->db->prepare("
-                    SELECT 
-                        c.idConvite,
-                        c.status,
-                        c.data_criacao,
-                        p.nome AS nomePersonal,
-                        p.email AS emailPersonal,
-                        a.nome AS nomeAluno,
-                        a.email AS emailAluno,
-                        a.idAluno,
-                        p.idPersonal
-                    FROM convites c
-                    JOIN personal p ON c.idPersonal = p.idPersonal
-                    LEFT JOIN alunos a ON c.idAluno = a.idAluno
-                    WHERE c.token = ? AND c.status = 'pendente'
-                    ORDER BY c.data_criacao DESC
-                ");
-                $stmt->execute([$parametro]);
-            }
-            
-            $convites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            if (empty($convites)) {
-                http_response_code(404);
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'Nenhum convite pendente encontrado.'
-                ]);
-                return;
-            }
-
-            http_response_code(200);
-            echo json_encode([
-                'success' => true,
-                'message' => 'Convites encontrados.',
-                'data' => $convites
-            ]);
-        } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'error' => 'Erro no banco: ' . $e->getMessage()
-            ]);
-        }
-    }
-    // public function getConvites($emailAluno)
-    // {
-    //     header('Content-Type: application/json');
-    //     try {
-    //         // busca todos os convites pendentes pelo email do aluno
-    //         $stmt = $this->db->prepare("
-    //         SELECT 
-    //             c.idConvite,
-    //             c.status,
-    //             c.data_criacao,
-    //             p.nome AS nomePersonal,
-    //             p.email AS emailPersonal,
-    //             a.nome AS nomeAluno,
-    //             a.email AS emailAluno,
-    //             a.idAluno,
-    //             p.idPersonal
-    //         FROM convites c
-    //         JOIN personal p ON c.idPersonal = p.idPersonal
-    //         LEFT JOIN alunos a ON c.idAluno = a.idAluno
-    //         WHERE a.email = ? AND c.status = 'pendente'
-    //         ORDER BY c.data_criacao DESC
-    //     ");
-    //         $stmt->execute([$emailAluno]);
-    //         $convites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    //         if (empty($convites)) {
-    //             http_response_code(404);
-    //             echo json_encode([
-    //                 'success' => false,
-    //                 'error' => 'Nenhum convite pendente encontrado para este aluno.'
-    //             ]);
-    //             return;
-    //         }
-
-    //         http_response_code(200);
-    //         echo json_encode([
-    //             'success' => true,
-    //             'message' => 'Convites encontrados.',
-    //             'data' => $convites
-    //         ]);
-    //     } catch (PDOException $e) {
-    //         http_response_code(500);
-    //         echo json_encode([
-    //             'success' => false,
-    //             'error' => 'Erro no banco: ' . $e->getMessage()
-    //         ]);
-    //     }
-    // }
-
-    /**
-     * Busca convites por email do aluno
-     */
-    public function getConvitesByEmail($emailEncoded)
-    {
-        header('Content-Type: application/json');
-        
-        // ✅ CORREÇÃO: usar o parâmetro correto
-        $email = urldecode($emailEncoded);
-        
-        try {
+            // busca todos os convites pendentes pelo email do aluno
             $stmt = $this->db->prepare("
-                SELECT 
-                    c.idConvite,
-                    c.status,
-                    c.data_criacao,
-                    p.nome AS nomePersonal,
-                    p.email AS emailPersonal,
-                    a.nome AS nomeAluno,
-                    a.email AS emailAluno,
-                    a.idAluno,
-                    p.idPersonal
-                FROM convites c
-                JOIN personal p ON c.idPersonal = p.idPersonal
-                LEFT JOIN alunos a ON c.idAluno = a.idAluno
-                WHERE a.email = ? AND c.status = 'pendente'
-                ORDER BY c.data_criacao DESC
-            ");
-            $stmt->execute([$email]);
+            SELECT 
+                c.idConvite,
+                c.status,
+                c.data_criacao,
+                p.nome AS nomePersonal,
+                p.email AS emailPersonal,
+                a.nome AS nomeAluno,
+                a.email AS emailAluno,
+                a.idAluno,
+                p.idPersonal
+            FROM convites c
+            JOIN personal p ON c.idPersonal = p.idPersonal
+            LEFT JOIN alunos a ON c.idAluno = a.idAluno
+            WHERE a.email = ? AND c.status = 'pendente'
+            ORDER BY c.data_criacao DESC
+        ");
+            $stmt->execute([$emailAluno]);
             $convites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (empty($convites)) {
                 http_response_code(404);
                 echo json_encode([
                     'success' => false,
-                    'error' => 'Nenhum convite pendente encontrado para este email.'
+                    'error' => 'Nenhum convite pendente encontrado para este aluno.'
                 ]);
                 return;
             }
@@ -294,6 +167,7 @@ class ConvitesController
             ]);
         }
     }
+
 
     /**
      * Aceita o convite (Aluno aceita).

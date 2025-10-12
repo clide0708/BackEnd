@@ -345,10 +345,11 @@ $routes = [
         'controller' => 'ConvitesController',
         'method' => 'criarConvite'
     ],
-    'convites/email/(.+)' => [
-        'controller' => 'ConvitesController', 
-        'method' => 'getConvitesByEmail'
+    'convites/([^/]+)' => [
+        'controller' => 'ConvitesController',
+        'method' => 'getConvites'
     ],
+
     'convites/(\d+)/aceitar' => [
         'controller' => 'ConvitesController',
         'method' => 'aceitarConvite'
@@ -356,10 +357,6 @@ $routes = [
     'convites/(\d+)/negar' => [
         'controller' => 'ConvitesController',
         'method' => 'negarConvite'
-    ],
-    'convites/([^/]+)' => [
-        'controller' => 'ConvitesController',
-        'method' => 'getConvites'
     ],
 
     // Rotas para Recuperação de Senha
