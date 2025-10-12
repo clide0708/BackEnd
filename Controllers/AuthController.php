@@ -16,7 +16,7 @@
         {
             try {
                 header("Access-Control-Allow-Credentials: true");
-                
+
                 if (!isset($data['email']) || !isset($data['senha'])) {
                     http_response_code(400 );
                     echo json_encode(['success' => false, 'error' => 'Email e senha são obrigatórios']);
@@ -182,7 +182,7 @@
                     ]);
                 } else {
                     http_response_code(401 );
-                    echo json_encode(['success' => false, 'error' => 'Email ou senha incorretos ou conta inativa']);
+                    echo json_encode(['success' => false, 'error' => 'Dados incompletos: Email ou senha incorretos ou conta inativa']);
                 }
             } catch (PDOException $e) {
                 http_response_code(500 );

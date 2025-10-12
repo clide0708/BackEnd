@@ -9,7 +9,7 @@
             $dotenv->load();
 
             $host = $_ENV['DB_HOST'] ?? 'localhost';
-            $db   = $_ENV['DB_NAME'] ?? 'bd_tcc'; 
+            $db   = $_ENV['DB_NAME'] ?? 'bd_clidefit'; 
             $user = $_ENV['DB_USER'] ?? 'root';
             $pass = $_ENV['DB_PASS'] ?? ''; 
             $charset = 'utf8mb4';
