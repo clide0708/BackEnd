@@ -250,7 +250,7 @@
         }
 
         public function verificarVinculoAlunoPersonal($idAluno, $idPersonal) {
-            $stmt = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ? AND idPersonal = ?");
+            $stmt = $this->db->prepare("SELECT idAluno FROM alunos WHERE idAluno = ? AND idPersonal = ?");
             $stmt->execute([$idAluno, $idPersonal]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -267,12 +267,24 @@
         }
 
         // Duplicação de Treinos
-        public function duplicarTreino($treinoOriginal, $novosDados) {
-            $campos = array_keys($treinoOriginal);
-            $placeholders = implode(',', array_fill(0, count($campos), '?'));
+        public function duplicarTreino($dadosTreino) {
+            $sql = "INSERT INTO treinos (idAluno, idPersonal, criadoPor, nome, tipo, descricao, data_criacao, data_ultima_modificacao, tipo_treino) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
-            $stmt = $this->db->prepare("INSERT INTO treinos (" . implode(',', $campos) . ") VALUES ($placeholders)");
-            return $stmt->execute(array_values($treinoOriginal));
+            $stmt = $this->db->prepare($sql);
+            $success = $stmt->execute([
+                $dadosTreino['idAluno'],
+                $dadosTreino['idPersonal'],
+                $dadosTreino['criadoPor'],
+                $dadosTreino['nome'],
+                $dadosTreino['tipo'],
+                $dadosTreino['descricao'],
+                $dadosTreino['data_criacao'],
+                $dadosTreino['data_ultima_modificacao'],
+                $dadosTreino['tipo_treino']
+            ]);
+
+            return $success ? $this->db->lastInsertId() : false;
         }
 
         public function duplicarExerciciosTreino($idTreinoOrigem, $idTreinoDestino) {
@@ -283,8 +295,8 @@
 
             // Inserir exercícios no novo treino
             $stmtInsert = $this->db->prepare("
-                INSERT INTO treino_exercicio (idTreino, idExercicio, idExercAdaptado, series, repeticoes, carga, descanso, ordem, observacoes, data_criacao, data_ultima_modificacao) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO treino_exercicio (idTreino, idExercicio, series, repeticoes, carga, descanso, ordem, observacoes, data_criacao, data_ultima_modificacao) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $now = date('Y-m-d H:i:s');
@@ -292,7 +304,6 @@
                 $stmtInsert->execute([
                     $idTreinoDestino,
                     $ex['idExercicio'],
-                    $ex['idExercAdaptado'],
                     $ex['series'],
                     $ex['repeticoes'],
                     $ex['carga'],

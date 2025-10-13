@@ -349,6 +349,18 @@
             }
         }
 
+        public function listarTreinosDoAlunoAtribuidos($idPersonal, $idAluno) {
+            // Buscar treinos onde idPersonal é o personal logado E idAluno é o aluno específico
+            $stmt = $this->db->prepare("
+                SELECT t.* 
+                FROM treinos t
+                WHERE t.idPersonal = ? AND t.idAluno = ?
+                ORDER BY t.data_ultima_modificacao DESC
+            ");
+            $stmt->execute([$idPersonal, $idAluno]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
         public function desvincularAluno($idAluno, $idPersonal, $usuario) {
             // Verificar permissão
             if ($usuario['tipo'] !== 'personal' || $usuario['sub'] != $idPersonal) {

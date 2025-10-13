@@ -355,7 +355,7 @@
                     return;
                 }
 
-                $this->treinosService->desvincularAluno($idAluno, $idPersonal);
+                $this->treinosService->desvincularAluno($idAluno, $idPersonal, $usuario);
                 
                 http_response_code(200);
                 echo json_encode([
@@ -442,20 +442,39 @@
         public function listarTreinosDoAlunoAtribuidos($idPersonal, $idAluno) {
             try {
                 $usuario = $this->obterUsuarioDoToken();
+                
                 if (!$usuario || $usuario['sub'] != $idPersonal || $usuario['tipo'] !== 'personal') {
                     http_response_code(403);
                     echo json_encode(['success' => false, 'error' => 'Você não tem permissão para ver estes treinos']);
                     return;
                 }
 
-                $treinos = $this->treinosService->listarTreinosDoAlunoAtribuidos($idPersonal, $idAluno);
+                // Verificar se o aluno pertence a este personal
+                $stmt = $this->db->prepare("SELECT idAluno FROM alunos WHERE idAluno = ? AND idPersonal = ?");
+                $stmt->execute([$idAluno, $idPersonal]);
+                $aluno = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$aluno) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Aluno não encontrado ou não vinculado a você']);
+                    return;
+                }
+
+                // Buscar treinos atribuídos a este aluno
+                $stmt = $this->db->prepare("
+                    SELECT t.* 
+                    FROM treinos t 
+                    WHERE t.idPersonal = ? AND t.idAluno = ?
+                    ORDER BY t.data_ultima_modificacao DESC
+                ");
+                $stmt->execute([$idPersonal, $idAluno]);
+                $treinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 http_response_code(200);
                 echo json_encode(['success' => true, 'treinos' => $treinos]);
 
             } catch (Exception $e) {
-                $statusCode = $e->getCode() ?: 400;
-                http_response_code($statusCode);
+                http_response_code(500);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
@@ -511,7 +530,18 @@
                     return;
                 }
 
-                $this->treinosService->desatribuirTreinoDoAluno($idTreino, $usuario);
+                // Verificar se o treino pertence a este personal
+                $stmt = $this->db->prepare("SELECT idTreino FROM treinos WHERE idTreino = ? AND idPersonal = ?");
+                $stmt->execute([$idTreino, $usuario['sub']]);
+                $treino = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$treino) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Treino não encontrado ou você não tem permissão para desatribuí-lo']);
+                    return;
+                }
+
+                $this->treinosService->excluirTreino($idTreino, $usuario);
                 
                 http_response_code(200);
                 echo json_encode(['success' => true, 'message' => 'Treino desatribuído do aluno com sucesso']);
