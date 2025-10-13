@@ -327,20 +327,12 @@
             $this->repository->beginTransaction();
 
             try {
-                // Duplicar treino para o aluno
-                $novoTreino = [
-                    'idAluno' => $idAluno,
-                    'idPersonal' => $idPersonal,
-                    'criadoPor' => $treinoOriginal['criadoPor'],
-                    'nome' => $treinoOriginal['nome'],
-                    'tipo' => $treinoOriginal['tipo'],
-                    'descricao' => $treinoOriginal['descricao'],
-                    'data_criacao' => date('Y-m-d H:i:s'),
-                    'data_ultima_modificacao' => date('Y-m-d H:i:s'),
-                    'tipo_treino' => $treinoOriginal['tipo_treino']
-                ];
+                // Duplicar treino
+                unset($treinoOriginal['idTreino']);
+                $treinoOriginal['idAluno'] = $idAluno;
+                $treinoOriginal['data_ultima_modificacao'] = date('Y-m-d H:i:s');
 
-                $novoIdTreino = $this->repository->criarTreino($novoTreino);
+                $novoIdTreino = $this->repository->duplicarTreino($treinoOriginal, $treinoOriginal);
                 if (!$novoIdTreino) {
                     throw new Exception("Falha ao duplicar treino");
                 }
@@ -355,12 +347,6 @@
                 $this->repository->rollBack();
                 throw $e;
             }
-        }
-
-        public function verificarVinculoAlunoPersonal($idAluno, $idPersonal) {
-            $stmt = $this->db->prepare("SELECT * FROM alunos WHERE idAluno = ? AND idPersonal = ?");
-            $stmt->execute([$idAluno, $idPersonal]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
         public function desvincularAluno($idAluno, $idPersonal, $usuario) {

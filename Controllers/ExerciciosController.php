@@ -170,7 +170,7 @@
                 $this->db->beginTransaction();
 
                 try {
-                    // Cadastrar na tabela exercicios
+                    // AGORA: Cadastrar apenas na tabela exercicios
                     $sql = "INSERT INTO exercicios (nome, grupoMuscular, descricao, cadastradoPor, visibilidade, idPersonal, tipo_exercicio) 
                             VALUES (?, ?, ?, ?, 'personal', ?, ?)";
                     $stmt = $this->db->prepare($sql);
@@ -186,7 +186,7 @@
                     $idExercicio = $this->db->lastInsertId();
 
                     if ($success) {
-                        // CORREÇÃO: Adicionar vídeo se fornecido - AGORA FUNCIONANDO
+                        // Adicionar vídeo se fornecido
                         if (!empty(trim($data['video_url'] ?? ''))) {
                             $video_url = trim($data['video_url']);
                             $cover = $this->gerarYouTubeThumbnail($video_url);
@@ -194,8 +194,6 @@
                             $sqlVideo = "INSERT INTO videos (url, idExercicio, cover) VALUES (?, ?, ?)";
                             $stmtVideo = $this->db->prepare($sqlVideo);
                             $stmtVideo->execute([$video_url, $idExercicio, $cover]);
-                            
-                            echo "Vídeo inserido com sucesso para o exercício ID: " . $idExercicio;
                         }
                         
                         $this->db->commit();
