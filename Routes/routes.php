@@ -308,6 +308,16 @@
             'method' => 'buscarVideosPorExercicio'
         ],
 
+        'perfil/historico-treinos' => [
+            'controller' => 'PerfilController',
+            'method' => 'getHistoricoTreinos'
+        ],
+        'perfil/retomar-treino/(\d+)' => [
+            'controller' => 'PerfilController',
+            'method' => 'retomarTreino'
+        ],
+
+
         // =============================
         // ROTAS PARA ALIMENTOS CONTROLLER
         // =============================

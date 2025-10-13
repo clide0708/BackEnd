@@ -397,6 +397,50 @@
                 throw $e;
             }
         }
+
+        public function criarSessao($idTreino, $usuario) {
+            $data = [
+                'idTreino' => $idTreino,
+                'idUsuario' => $usuario['sub'],
+                'tipo_usuario' => $usuario['tipo'],
+                'progresso_json' => ['exIndex' => 0, 'serieAtual' => 1, 'exercicios_concluidos' => []]
+            ];
+            $idSessao = $this->repository->criarSessaoTreino($data);
+            if (!$idSessao) {
+                throw new Exception("Falha ao criar sessão de treino");
+            }
+            return $idSessao;
+        }
+
+        public function finalizarSessao($idSessao, $progresso, $duracao, $notas = null) {
+            $data = [
+                'status' => 'concluido',
+                'progresso_json' => $progresso,
+                'duracao_total' => $duracao,
+                'notas' => $notas
+            ];
+            $success = $this->repository->atualizarSessaoTreino($idSessao, $data);
+            if (!$success) {
+                throw new Exception("Falha ao finalizar sessão");
+            }
+            return true;
+        }
+
+        public function getHistoricoTreinos($usuario, $dias = 30) {
+            return $this->repository->buscarHistoricoTreinos($usuario['sub'], $usuario['tipo'], $dias);
+        }
+
+        public function getSessaoParaRetomar($idSessao) {
+            $sessao = $this->repository->buscarSessaoPorId($idSessao);
+            if (!$sessao || $sessao['status'] !== 'em_progresso') {
+                throw new Exception("Sessão não encontrada ou já concluída");
+            }
+            $progresso = json_decode($sessao['progresso_json'], true);
+            return [
+                'sessao' => $sessao,
+                'progresso' => $progresso ?? ['exIndex' => 0, 'serieAtual' => 1, 'exercicios_concluidos' => []]
+            ];
+        }
     }
 
 ?>

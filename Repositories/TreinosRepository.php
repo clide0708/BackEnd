@@ -317,6 +317,56 @@
 
             return true;
         }
+
+        public function criarSessaoTreino($data) {
+            $sql = "INSERT INTO treino_sessao (idTreino, idUsuario, tipo_usuario, data_inicio, status, progresso_json) 
+                    VALUES (?, ?, ?, NOW(), ?, ?)";
+            $stmt = $this->db->prepare($sql);
+            $success = $stmt->execute([
+                $data['idTreino'],
+                $data['idUsuario'],
+                $data['tipo_usuario'],
+                $data['status'] ?? 'em_progresso',
+                json_encode($data['progresso_json'] ?? '{}')
+            ]);
+            return $success ? $this->db->lastInsertId() : false;
+        }
+
+        public function atualizarSessaoTreino($idSessao, $data) {
+            $sql = "UPDATE treino_sessao SET data_fim = NOW(), status = ?, progresso_json = ?, duracao_total = ?, notas = ? 
+                    WHERE idSessao = ?";
+            $stmt = $this->db->prepare($sql);
+            return $stmt->execute([
+                $data['status'],
+                json_encode($data['progresso_json'] ?? '{}'),
+                $data['duracao_total'] ?? 0,
+                $data['notas'] ?? null,
+                $idSessao
+            ]);
+        }
+
+        public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
+            $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
+            $sql = "
+                SELECT 
+                    ts.idSessao, ts.idTreino, ts.data_inicio, ts.data_fim, ts.status, 
+                    ts.progresso_json, ts.duracao_total,
+                    t.nome AS nome_treino, t.descricao, t.tipo_treino
+                FROM treino_sessao ts
+                INNER JOIN treinos t ON ts.idTreino = t.idTreino
+                WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
+                ORDER BY ts.data_inicio DESC
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        public function buscarSessaoPorId($idSessao) {
+            $stmt = $this->db->prepare("SELECT * FROM treino_sessao WHERE idSessao = ?");
+            $stmt->execute([$idSessao]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        }
     }
 
 ?>

@@ -455,4 +455,54 @@ class PerfilController
             ]);
         }
     }
+    
+    public function getHistoricoTreinos() {
+        header('Content-Type: application/json');
+        if (!$this->idUsuarioLogado) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Usuário não autenticado.']);
+            return;
+        }
+
+        try {
+            require_once __DIR__ . '/../Services/TreinosService.php';
+            $treinosService = new TreinosService();
+            $historico = $treinosService->getHistoricoTreinos($this->usuarioLogado);
+            
+            http_response_hcode(200);
+            echo json_encode(['success' => true, 'historico' => $historico]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function retomarTreino($idSessao) {
+        header('Content-Type: application/json');
+        if (!$this->idUsuarioLogado) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Usuário não autenticado.']);
+            return;
+        }
+
+        try {
+            require_once __DIR__ . '/../Services/TreinosService.php';
+            $treinosService = new TreinosService();
+            $dadosRetomar = $treinosService->getSessaoParaRetomar($idSessao);
+            
+            // Buscar treino completo
+            $treinoCompleto = $treinosService->buscarTreinoCompleto($dadosRetomar['sessao']['idTreino'], $this->usuarioLogado);
+            
+            http_response_code(200);
+            echo json_encode([
+                'success' => true,
+                'treino' => $treinoCompleto,
+                'progresso' => $dadosRetomar['progresso'],
+                'idSessao' => $idSessao
+            ]);
+        } catch (Exception $e) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
 }
