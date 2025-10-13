@@ -267,12 +267,24 @@
         }
 
         // Duplicação de Treinos
-        public function duplicarTreino($treinoOriginal, $novosDados) {
-            $campos = array_keys($treinoOriginal);
-            $placeholders = implode(',', array_fill(0, count($campos), '?'));
+        public function duplicarTreino($dadosTreino) {
+            $sql = "INSERT INTO treinos (idAluno, idPersonal, criadoPor, nome, tipo, descricao, data_criacao, data_ultima_modificacao, tipo_treino) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
-            $stmt = $this->db->prepare("INSERT INTO treinos (" . implode(',', $campos) . ") VALUES ($placeholders)");
-            return $stmt->execute(array_values($treinoOriginal));
+            $stmt = $this->db->prepare($sql);
+            $success = $stmt->execute([
+                $dadosTreino['idAluno'],
+                $dadosTreino['idPersonal'],
+                $dadosTreino['criadoPor'],
+                $dadosTreino['nome'],
+                $dadosTreino['tipo'],
+                $dadosTreino['descricao'],
+                $dadosTreino['data_criacao'],
+                $dadosTreino['data_ultima_modificacao'],
+                $dadosTreino['tipo_treino']
+            ]);
+
+            return $success ? $this->db->lastInsertId() : false;
         }
 
         public function duplicarExerciciosTreino($idTreinoOrigem, $idTreinoDestino) {

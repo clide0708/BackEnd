@@ -205,7 +205,10 @@
                 ");
                 $stmt->execute([$exercicio['id']]);
                 $video = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                // CORREÇÃO: Garantir que a URL do vídeo seja passada corretamente
                 $exercicio['video_url'] = $video ? $video['url'] : null;
+                $exercicio['url'] = $video ? $video['url'] : null; // Para compatibilidade com o frontend
             }
             
             return $exercicios;

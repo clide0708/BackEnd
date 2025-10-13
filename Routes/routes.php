@@ -227,9 +227,9 @@
         ],
 
         // Listar treinos atribuídos a um aluno específico
-        'treinos/personal/(\d+)/aluno/(\d+)' => [
+        'treinos/personal/(\d+)/atribuidos' => [
             'controller' => 'TreinosController',
-            'method' => 'listarTreinosDoAlunoAtribuidos'
+            'method' => 'listarTreinosAtribuidos'
         ],
 
         // Atualizar treino atribuído
@@ -592,8 +592,8 @@
         'alimentos/buscar',
         'alimentos/informacao',
         'alimentos/testar-traducao',
-        'convites/email/([^/]+)',
-        'convites/([a-zA-Z0-9]{64})',
+        'convites/([^/]+)',
+        'treinos/aluno/personal/(\d+)',
         'perfil/aluno/(\d+)',
         'perfil/personal/(\d+)',
         'perfil/academia/(\d+)',
@@ -603,8 +603,8 @@
         'perfil/academia',
         'planos',
         'planos/(\d+)',
-        'exercicios/buscarTodos', // Tornar pública para facilitar desenvolvimento
-        'exercicios/globais',     // Tornar pública
+        'exercicios/buscarTodos',
+        'exercicios/globais',
     ];
 
 
@@ -665,8 +665,8 @@
             'alimentos/buscar',
             'alimentos/informacao',
             'alimentos/testar-traducao',
-            'convites/email/([^/]+)',
-            'convites/([a-zA-Z0-9]{64})',
+            'convites/([^/]+)', // CORREÇÃO AQUI TAMBÉM
+            'treinos/aluno/personal/(\d+)', // CORREÇÃO AQUI TAMBÉM
             'perfil/aluno/(\d+)',
             'perfil/personal/(\d+)',
             'perfil/academia/(\d+)',
