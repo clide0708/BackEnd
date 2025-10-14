@@ -87,12 +87,27 @@
                     return;
                 }
 
+                // LOG para debug
+                error_log("Tentando excluir treino ID: " . $idTreino . " por usuário: " . $usuario['email']);
+
                 $this->treinosService->excluirTreino($idTreino, $usuario);
+                
+                // Verificar se realmente foi excluído
+                $treinoRepository = new TreinosRepository();
+                $treinoVerificado = $treinoRepository->buscarTreinoPorId($idTreino);
+                
+                if ($treinoVerificado) {
+                    error_log("ERRO: Treino ID " . $idTreino . " ainda existe após exclusão!");
+                    throw new Exception("Falha na exclusão do treino - treino ainda existe no banco");
+                }
+                
+                error_log("SUCESSO: Treino ID " . $idTreino . " excluído com sucesso");
                 
                 http_response_code(200);
                 echo json_encode(['success' => true, 'message' => 'Treino excluído com sucesso']);
 
             } catch (Exception $e) {
+                error_log("ERRO na exclusão do treino " . $idTreino . ": " . $e->getMessage());
                 $statusCode = $e->getCode() ?: 400;
                 http_response_code($statusCode);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -464,19 +479,27 @@
                 // Buscar treinos atribuídos a este aluno
                 $stmt = $this->db->prepare("
                     SELECT t.* 
-                    FROM treinos t 
+                    FROM treinos t
                     WHERE t.idPersonal = ? AND t.idAluno = ?
                     ORDER BY t.data_ultima_modificacao DESC
                 ");
                 $stmt->execute([$idPersonal, $idAluno]);
                 $treinos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
+                // GARANTIR que sempre retorne um array, mesmo que vazio
                 http_response_code(200);
-                echo json_encode(['success' => true, 'treinos' => $treinos]);
+                echo json_encode([
+                    'success' => true, 
+                    'treinos' => $treinos ?: [] // Array vazio se for null
+                ]);
 
             } catch (Exception $e) {
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => $e->getMessage(),
+                    'treinos' => [] // Sempre retornar array vazio em caso de erro
+                ]);
             }
         }
 

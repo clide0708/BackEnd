@@ -155,6 +155,12 @@
         }
 
         public function excluirTreino($idTreino, $usuario) {
+            // Verificar se o treino existe
+            $treino = $this->repository->buscarTreinoPorId($idTreino);
+            if (!$treino) {
+                throw new Exception("Treino não encontrado", 404);
+            }
+
             // Verificar permissão
             if (!$this->repository->verificarPermissaoTreino($idTreino, $usuario)) {
                 throw new Exception("Você não tem permissão para excluir este treino");
@@ -167,7 +173,10 @@
                 // Excluir exercícios relacionados
                 $exercicios = $this->repository->buscarExerciciosDoTreino($idTreino);
                 foreach ($exercicios as $exercicio) {
-                    $this->repository->removerExercicioDoTreino($exercicio['idTreino_Exercicio']);
+                    $success = $this->repository->removerExercicioDoTreino($exercicio['idTreino_Exercicio']);
+                    if (!$success) {
+                        throw new Exception("Falha ao excluir exercícios do treino");
+                    }
                 }
 
                 // Excluir treino

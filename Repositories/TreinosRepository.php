@@ -129,7 +129,12 @@
         }
 
         public function verificarPermissaoTreino($idTreino, $usuario) {
-            $stmt = $this->db->prepare("SELECT * FROM treinos WHERE idTreino = ?");
+            $stmt = $this->db->prepare("
+                SELECT t.*, 
+                    LOWER(TRIM(t.criadoPor)) as criadoPorEmail 
+                FROM treinos t 
+                WHERE t.idTreino = ?
+            ");
             $stmt->execute([$idTreino]);
             $treino = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -138,7 +143,7 @@
             }
 
             $emailUsuario = strtolower(trim($usuario['email']));
-            $emailCriador = strtolower(trim($treino['criadoPor']));
+            $emailCriador = $treino['criadoPorEmail'];
 
             // Verificar se o usuário é o criador do treino
             if ($usuario['tipo'] === 'aluno' && !is_null($treino['idAluno']) && 
@@ -182,27 +187,39 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-
         public function buscarExerciciosDoTreino($idTreino) {
             $stmt = $this->db->prepare("
-                SELECT te.*,
-                    e.nome as nomeExercicio,
-                    e.grupoMuscular as grupoMuscularExercicio,
-                    e.descricao as descricaoExercicio,
-                    ea.nome as nomeExercAdaptado,
-                    ea.grupoMuscular as grupoMuscularExercAdaptado,
-                    ea.descricao as descricaoExercAdaptado,
-                    v.url as video_url
+                SELECT te.*, e.nome, e.grupoMuscular, e.descricao, v.url as video_url
                 FROM treino_exercicio te
                 LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio
-                LEFT JOIN exercadaptados ea ON te.idExercAdaptado = ea.idExercAdaptado
-                LEFT JOIN videos v ON (te.idExercicio = v.idExercicio OR te.idExercAdaptado = v.idExercAdaptado)
+                LEFT JOIN videos v ON te.idExercicio = v.idExercicio
                 WHERE te.idTreino = ?
                 ORDER BY te.ordem
             ");
             $stmt->execute([$idTreino]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
+
+        // public function buscarExerciciosDoTreino($idTreino) {
+        //     $stmt = $this->db->prepare("
+        //         SELECT te.*,
+        //             e.nome as nomeExercicio,
+        //             e.grupoMuscular as grupoMuscularExercicio,
+        //             e.descricao as descricaoExercicio,
+        //             ea.nome as nomeExercAdaptado,
+        //             ea.grupoMuscular as grupoMuscularExercAdaptado,
+        //             ea.descricao as descricaoExercAdaptado,
+        //             v.url as video_url
+        //         FROM treino_exercicio te
+        //         LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio
+        //         LEFT JOIN exercadaptados ea ON te.idExercAdaptado = ea.idExercAdaptado
+        //         LEFT JOIN videos v ON (te.idExercicio = v.idExercicio OR te.idExercAdaptado = v.idExercAdaptado)
+        //         WHERE te.idTreino = ?
+        //         ORDER BY te.ordem
+        //     ");
+        //     $stmt->execute([$idTreino]);
+        //     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // }
 
         public function atualizarExercicioNoTreino($idTreinoExercicio, $data) {
             $sql = "UPDATE treino_exercicio SET series = ?, repeticoes = ?, carga = ?, descanso = ?, ordem = ?, observacoes = ?, data_ultima_modificacao = ? 
