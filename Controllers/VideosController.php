@@ -94,6 +94,13 @@
                 $stmt->execute([$idExercicio]);
                 $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+                // Garantir que cada vídeo tenha uma thumbnail
+                foreach ($videos as &$video) {
+                    if (empty($video['cover']) && !empty($video['url'])) {
+                        $video['cover'] = $this->gerarYouTubeThumbnail($video['url']);
+                    }
+                }
+
                 http_response_code(200);
                 echo json_encode(['success' => true, 'videos' => $videos]);
             } catch (Exception $e) {

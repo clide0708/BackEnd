@@ -291,6 +291,24 @@
             'method' => 'buscarTreinoCompleto'
         ],
 
+        // Rotas para sessões/histórico de treinos
+        'treinos/historico' => [
+            'controller' => 'TreinosController',
+            'method' => 'getHistoricoTreinos'
+        ],
+        'treinos/criar-sessao' => [
+            'controller' => 'TreinosController',
+            'method' => 'criarSessaoTreino'
+        ],
+        'treinos/finalizar-sessao/(\d+)' => [  // (\d+) para capturar o ID como parâmetro
+            'controller' => 'TreinosController',
+            'method' => 'finalizarSessaoTreino'
+        ],
+        'treinos/retomar-sessao/(\d+)' => [  // (\d+) para capturar o ID
+            'controller' => 'TreinosController',
+            'method' => 'getSessaoParaRetomar'
+        ],
+
         // =============================
         // ROTAS PARA VÍDEOS CONTROLLER
         // =============================
@@ -307,16 +325,6 @@
             'controller' => 'VideosController',
             'method' => 'buscarVideosPorExercicio'
         ],
-
-        'perfil/historico-treinos' => [
-            'controller' => 'PerfilController',
-            'method' => 'getHistoricoTreinos'
-        ],
-        'perfil/retomar-treino/(\d+)' => [
-            'controller' => 'PerfilController',
-            'method' => 'retomarTreino'
-        ],
-
 
         // =============================
         // ROTAS PARA ALIMENTOS CONTROLLER
