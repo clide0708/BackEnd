@@ -413,17 +413,37 @@
         }
 
         public function finalizarSessao($idSessao, $progresso, $duracao, $notas = null) {
+            $sessao = $this->repository->buscarSessaoPorId($idSessao);
+            if (!$sessao) {
+                throw new Exception("Sessão não encontrada");
+            }
+            // Calcular porcentagem baseada em progresso
+            $porcentagem = $this->calcularPorcentagemProgresso($progresso, $sessao['idTreino']);
+            $status = ($porcentagem >= 100) ? 'concluido' : 'em_progresso';  // Corrige status
             $data = [
-                'status' => 'concluido',
+                'status' => $status,
                 'progresso_json' => $progresso,
                 'duracao_total' => $duracao,
-                'notas' => $notas
+                'notas' => $notas,
+                'porcentagem_concluida' => $porcentagem  // Adiciona para histórico
             ];
             $success = $this->repository->atualizarSessaoTreino($idSessao, $data);
             if (!$success) {
                 throw new Exception("Falha ao finalizar sessão");
             }
             return true;
+        }
+
+        private function calcularPorcentagemProgresso($progresso, $idTreino) {
+            $exerciciosTotais = $this->repository->contarExerciciosTreino($idTreino);
+            $exerciciosConcluidos = count($progresso['exercicios_concluidos'] ?? []);
+            $seriesTotais = $this->repository->somarSeriesTreino($idTreino);
+            $seriesConcluidas = $progresso['serieAtual'] ?? 0;
+            
+            $pctExercicios = ($exerciciosTotais > 0) ? ($exerciciosConcluidos / $exerciciosTotais) * 100 : 0;
+            $pctSeries = ($seriesTotais > 0) ? ($seriesConcluidas / $seriesTotais) * 100 : 0;
+            
+            return round(($pctExercicios + $pctSeries) / 2);  // Média simples
         }
 
         public function getHistoricoTreinos($usuario, $dias = 30) {

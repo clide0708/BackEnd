@@ -347,25 +347,82 @@
 
         public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
             $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
+            
             $sql = "
                 SELECT 
                     ts.idSessao, ts.idTreino, ts.data_inicio, ts.data_fim, ts.status, 
-                    ts.progresso_json, ts.duracao_total,
-                    t.nome AS nome_treino, t.descricao, t.tipo_treino
+                    ts.progresso_json, ts.duracao_total, ts.notas,
+                    t.nome AS nome_treino, t.descricao, t.tipo_treino,
+                    -- Nome do criador (personal ou aluno)
+                    CASE 
+                        WHEN t.idPersonal IS NOT NULL THEN p.nome
+                        WHEN t.idAluno IS NOT NULL THEN a.nome
+                        ELSE 'Usuário desconhecido'
+                    END AS nome_criador,
+                    -- Primeiro exercício para thumbnail (URL do vídeo)
+                    v.url AS primeiro_video_url,
+                    e.nome AS primeiro_exercicio_nome,
+                    -- Cálculo de porcentagem baseado em progresso_json (simplificado)
+                    CASE 
+                        WHEN ts.status = 'concluido' THEN 100
+                        ELSE (
+                            COALESCE(
+                                JSON_UNQUOTE(JSON_EXTRACT(ts.progresso_json, '$.exercicios_concluidos')) / 
+                                (SELECT COUNT(*) FROM treino_exercicio tex WHERE tex.idTreino = ts.idTreino),
+                                0
+                            ) * 100 + 
+                            COALESCE(
+                                JSON_UNQUOTE(JSON_EXTRACT(ts.progresso_json, '$.serieAtual')) / 
+                                (SELECT MAX(series) FROM treino_exercicio tex WHERE tex.idTreino = ts.idTreino),
+                                0
+                            ) * 100
+                        ) / 2  -- Média entre exercícios e séries
+                    END AS porcentagem_concluida
                 FROM treino_sessao ts
                 INNER JOIN treinos t ON ts.idTreino = t.idTreino
+                LEFT JOIN personal p ON t.idPersonal = p.idPersonal  -- Correção: usar idPersonal
+                LEFT JOIN alunos a ON t.idAluno = a.idAluno  -- Correção: usar idAluno
+                LEFT JOIN treino_exercicio te ON t.idTreino = te.idTreino AND te.ordem = 1  -- Primeiro exercício (ordem 1)
+                LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio  -- Dados do exercício
+                LEFT JOIN videos v ON te.idExercicio = v.idExercicio  -- Vídeo do exercício
                 WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
                 ORDER BY ts.data_inicio DESC
             ";
+            
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Processar resultados para ajustar status baseado em porcentagem
+            foreach ($resultados as &$resultado) {
+                $porcentagem = $resultado['porcentagem_concluida'] ?? 0;
+                if ($resultado['status'] === 'concluido' && $porcentagem < 100) {
+                    $resultado['status'] = 'em_progresso';  // Corrige status se progresso <100%
+                }
+                $resultado['porcentagem_concluida'] = round($porcentagem);  // Arredonda para exibição
+                $resultado['data_formatada'] = date('d/m', strtotime($resultado['data_inicio']));  // Formato DD/MM
+                $resultado['tipo_display'] = ($resultado['tipo_treino'] === 'adaptado') ? 'Adaptado' : 'Normal';
+            }
+
+            return $resultados;
         }
 
         public function buscarSessaoPorId($idSessao) {
             $stmt = $this->db->prepare("SELECT * FROM treino_sessao WHERE idSessao = ?");
             $stmt->execute([$idSessao]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        public function contarExerciciosTreino($idTreino) {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_exercicio WHERE idTreino = ?");
+            $stmt->execute([$idTreino]);
+            return $stmt->fetchColumn();
+        }
+
+        public function somarSeriesTreino($idTreino) {
+            $stmt = $this->db->prepare("SELECT SUM(series) FROM treino_exercicio WHERE idTreino = ?");
+            $stmt->execute([$idTreino]);
+            return $stmt->fetchColumn() ?: 0;
         }
     }
 
