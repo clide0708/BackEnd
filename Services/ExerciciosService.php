@@ -225,6 +225,109 @@
                 return null;
             }
         }
+
+        public function buscarExerciciosParaTreinoNormal($usuario) {
+            if ($usuario['tipo'] === 'aluno') {
+                $idPersonalAluno = $this->obterPersonalDoAluno($usuario['sub']);
+                return $this->listarExerciciosParaAlunoComFiltro($idPersonalAluno, 'normal');
+            } else if ($usuario['tipo'] === 'personal') {
+                return $this->listarExerciciosParaPersonalComFiltro($usuario['sub'], 'normal');
+            } else {
+                return $this->listarExerciciosGlobaisPorTipo('normal');
+            }
+        }
+
+        public function buscarExerciciosParaTreinoAdaptado($usuario) {
+            if ($usuario['tipo'] === 'aluno') {
+                $idPersonalAluno = $this->obterPersonalDoAluno($usuario['sub']);
+                return $this->listarExerciciosParaAlunoComFiltro($idPersonalAluno, 'adaptado');
+            } else if ($usuario['tipo'] === 'personal') {
+                return $this->listarExerciciosParaPersonalComFiltro($usuario['sub'], 'adaptado');
+            } else {
+                return $this->listarExerciciosGlobaisPorTipo('adaptado');
+            }
+        }
+
+        private function listarExerciciosParaAlunoComFiltro($idPersonalAluno, $tipo) {
+            $sql = "
+                SELECT 
+                    idExercicio as id,
+                    nome,
+                    grupoMuscular,
+                    descricao,
+                    tipo_exercicio,
+                    visibilidade,
+                    idPersonal,
+                    cadastradoPor
+                FROM exercicios 
+                WHERE (visibilidade = 'global' AND tipo_exercicio = ?)
+                OR (visibilidade = 'personal' AND idPersonal = ? AND tipo_exercicio = ?)
+                ORDER BY 
+                    CASE 
+                        WHEN visibilidade = 'global' THEN 1 
+                        WHEN visibilidade = 'personal' THEN 2 
+                    END,
+                    nome ASC
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$tipo, $idPersonalAluno, $tipo]);
+            $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $this->adicionarUrlsDeVideo($exercicios);
+        }
+
+        private function listarExerciciosParaPersonalComFiltro($idPersonal, $tipo) {
+            $sql = "
+                SELECT 
+                    idExercicio as id,
+                    nome,
+                    grupoMuscular,
+                    descricao,
+                    tipo_exercicio,
+                    visibilidade,
+                    idPersonal,
+                    cadastradoPor
+                FROM exercicios 
+                WHERE (visibilidade = 'global' AND tipo_exercicio = ?)
+                OR (visibilidade = 'personal' AND idPersonal = ?)
+                ORDER BY 
+                    CASE 
+                        WHEN visibilidade = 'global' THEN 1 
+                        WHEN visibilidade = 'personal' THEN 2 
+                    END,
+                    nome ASC
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$tipo, $idPersonal]);
+            $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $this->adicionarUrlsDeVideo($exercicios);
+        }
+
+        private function listarExerciciosGlobaisPorTipo($tipo) {
+            $sql = "
+                SELECT 
+                    idExercicio as id,
+                    nome,
+                    grupoMuscular,
+                    descricao,
+                    tipo_exercicio,
+                    visibilidade,
+                    idPersonal,
+                    cadastradoPor
+                FROM exercicios 
+                WHERE visibilidade = 'global' AND tipo_exercicio = ?
+                ORDER BY nome ASC
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$tipo]);
+            $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return $this->adicionarUrlsDeVideo($exercicios);
+        }
     }
 
 ?>

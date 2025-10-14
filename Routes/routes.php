@@ -98,6 +98,10 @@
             'controller' => 'ExerciciosController',
             'method' => 'buscarPorNome'
         ],
+        'exercicios/por-tipo/([a-zA-Z]+)' => [
+            'controller' => 'ExerciciosController',
+            'method' => 'buscarExerciciosPorTipo'
+        ],
 
         // Exercícios - CRUD tradicional (para admins)
         'exercicios/cadastrar' => [
