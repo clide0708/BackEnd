@@ -546,8 +546,7 @@
             }
         }
 
-        public function desatribuirTreinoDoAluno($idTreino)
-        {
+        public function desatribuirTreinoDoAluno($idTreino){
             try {
                 $usuario = $this->obterUsuarioDoToken();
                 if (!$usuario || $usuario['tipo'] !== 'personal') {
@@ -556,21 +555,48 @@
                     return;
                 }
 
-                // Verificar se o treino pertence a este personal
-                $stmt = $this->db->prepare("SELECT idTreino FROM treinos WHERE idTreino = ? AND idPersonal = ?");
-                $stmt->execute([$idTreino, $usuario['sub']]);
-                $treino = $stmt->fetch(PDO::FETCH_ASSOC);
-
+                // Verificar se o treino existe e pertence a este personal
+                $treino = $this->repository->buscarTreinoPorId($idTreino);
                 if (!$treino) {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Treino não encontrado ou você não tem permissão para desatribuí-lo']);
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'Treino não encontrado']);
                     return;
                 }
 
-                $this->treinosService->excluirTreino($idTreino, $usuario);
+                // Verificar se o personal é o dono do treino
+                if ($treino['idPersonal'] != $usuario['sub']) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Você não tem permissão para desatribuir este treino']);
+                    return;
+                }
 
-                http_response_code(200);
-                echo json_encode(['success' => true, 'message' => 'Treino desatribuído do aluno com sucesso']);
+                // Verificar se o treino tem sessões/histórico
+                $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_sessao WHERE idTreino = ?");
+                $stmt->execute([$idTreino]);
+                $temSessoes = $stmt->fetchColumn() > 0;
+
+                if ($temSessoes) {
+                    // Se tem histórico, apenas desvincular o aluno mantendo o treino e histórico
+                    $success = $this->repository->desvincularTreinoDoAluno($idTreino);
+                    if ($success) {
+                        http_response_code(200);
+                        echo json_encode([
+                            'success' => true, 
+                            'message' => 'Treino desvinculado do aluno (histórico mantido)'
+                        ]);
+                    } else {
+                        throw new Exception("Falha ao desvincular treino do aluno");
+                    }
+                } else {
+                    // Se não tem histórico, excluir completamente
+                    $this->treinosService->excluirTreino($idTreino, $usuario);
+                    http_response_code(200);
+                    echo json_encode([
+                        'success' => true, 
+                        'message' => 'Treino excluído com sucesso'
+                    ]);
+                }
+
             } catch (Exception $e) {
                 $statusCode = $e->getCode() ?: 400;
                 http_response_code($statusCode);

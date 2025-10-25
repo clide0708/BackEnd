@@ -221,7 +221,8 @@
         // Excluir treino
         'treinos/excluir/(\d+)' => [
             'controller' => 'TreinosController',
-            'method' => 'excluirTreino'
+            'method' => 'excluirTreino',
+            'http_method' => 'DELETE'
         ],
 
         // Listar alunos do personal

@@ -89,9 +89,62 @@
             ]);
         }
 
-        public function excluirTreino($idTreino) {
-            $stmt = $this->db->prepare("DELETE FROM treinos WHERE idTreino = ?");
-            return $stmt->execute([$idTreino]);
+        public function excluirTreino($idTreino){
+            try {
+                error_log("🗑️  Executando exclusão segura do treino {$idTreino}");
+                
+                // 1. Primeiro, remover a referência da última sessão para quebrar a constraint
+                $stmt = $this->db->prepare("UPDATE treinos SET ultima_sessao_id = NULL WHERE idTreino = ?");
+                $stmt->execute([$idTreino]);
+                error_log("✅ Referência da última sessão removida");
+                
+                // 2. Agora excluir o treino
+                $stmt = $this->db->prepare("DELETE FROM treinos WHERE idTreino = ?");
+                $result = $stmt->execute([$idTreino]);
+                
+                $rowCount = $stmt->rowCount();
+                error_log("📊 Rows affected na exclusão: " . $rowCount);
+                
+                return $result;
+            } catch (Exception $e) {
+                error_log("❌ ERRO no repository ao excluir treino {$idTreino}: " . $e->getMessage());
+                throw $e;
+            }
+        }
+
+        public function excluirTreinoCompleto($idTreino){
+            try {
+                error_log("🗑️  Executando exclusão completa do treino {$idTreino}");
+                
+                $this->db->beginTransaction();
+
+                // 1. Remover referência da última sessão nos treinos
+                $stmt1 = $this->db->prepare("UPDATE treinos SET ultima_sessao_id = NULL WHERE idTreino = ?");
+                $stmt1->execute([$idTreino]);
+                error_log("✅ Passo 1: Referência da última sessão removida");
+
+                // 2. Excluir exercícios do treino
+                $stmt2 = $this->db->prepare("DELETE FROM treino_exercicio WHERE idTreino = ?");
+                $stmt2->execute([$idTreino]);
+                $exerciciosExcluidos = $stmt2->rowCount();
+                error_log("✅ Passo 2: {$exerciciosExcluidos} exercícios excluídos");
+
+                // 3. Excluir o treino
+                $stmt3 = $this->db->prepare("DELETE FROM treinos WHERE idTreino = ?");
+                $stmt3->execute([$idTreino]);
+                $treinosExcluidos = $stmt3->rowCount();
+                error_log("✅ Passo 3: {$treinosExcluidos} treino(s) excluído(s)");
+
+                $this->db->commit();
+                error_log("🎉 Exclusão completa concluída com sucesso");
+                
+                return $treinosExcluidos > 0;
+
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                error_log("❌ ERRO na exclusão completa: " . $e->getMessage());
+                throw $e;
+            }
         }
 
         public function listarTreinosAluno($idAluno) {
@@ -611,6 +664,23 @@
                 error_log("Erro ao atualizar última sessão do treino: " . $e->getMessage());
                 return false;
             }
+        }
+
+        public function desvincularTreinoDoAluno($idTreino){
+            try {
+                // Apenas remove o vínculo com o aluno, mantendo o treino e histórico
+                $stmt = $this->db->prepare("UPDATE treinos SET idAluno = NULL WHERE idTreino = ?");
+                return $stmt->execute([$idTreino]);
+            } catch (Exception $e) {
+                error_log("Erro ao desvincular treino: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        public function treinoTemHistorico($idTreino){
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_sessao WHERE idTreino = ?");
+            $stmt->execute([$idTreino]);
+            return $stmt->fetchColumn() > 0;
         }
     }
 

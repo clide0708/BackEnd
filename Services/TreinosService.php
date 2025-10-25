@@ -154,7 +154,7 @@
             return true;
         }
 
-        public function excluirTreino($idTreino, $usuario) {
+        public function excluirTreino($idTreino, $usuario){
             // Verificar se o treino existe
             $treino = $this->repository->buscarTreinoPorId($idTreino);
             if (!$treino) {
@@ -166,68 +166,66 @@
                 throw new Exception("Você não tem permissão para excluir este treino");
             }
 
-            // VERIFICAR SE EXISTEM SESSÕES VINCULADAS
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_sessao WHERE idTreino = ?");
-            $stmt->execute([$idTreino]);
-            $sessoesExistentes = $stmt->fetchColumn();
-
-            if ($sessoesExistentes > 0) {
-                // Se existem sessões, fazer "soft delete" - apenas desatribuir
-                return $this->desatribuirTreinoSoft($idTreino, $usuario);
-            } else {
-                // Se não existem sessões, fazer exclusão completa
-                return $this->excluirTreinoHard($idTreino, $usuario);
-            }
-        }
-
-        private function desatribuirTreinoSoft($idTreino, $usuario) {
-            // Iniciar transação para garantir consistência
+            // Iniciar transação para excluir exercícios e treino
             $this->repository->beginTransaction();
-            
-            try {
-                $now = date('Y-m-d H:i:s');
-                
-                // 1. Buscar informações do treino antes de desatribuir
-                $treino = $this->repository->buscarTreinoPorId($idTreino);
-                if (!$treino) {
-                    throw new Exception("Treino não encontrado");
-                }
-                
-                $idAluno = $treino['idAluno'];
-                
-                // 2. Criar uma cópia do treino para o histórico (se necessário)
-                // Isso mantém o histórico intacto mesmo se o treino original for modificado
-                
-                // 3. Marcar o treino como desatribuído e inativo
-                $sql = "UPDATE treinos SET 
-                            idAluno = NULL, 
-                            data_ultima_modificacao = ?,
-                            status = 'desatribuido',
-                            ativo = 0
-                        WHERE idTreino = ? AND idPersonal = ?";
-                
-                $stmt = $this->db->prepare($sql);
-                $success = $stmt->execute([
-                    $now,
-                    $idTreino,
-                    $usuario['sub']
-                ]);
 
-                if (!$success) {
-                    throw new Exception("Falha ao desatribuir treino");
+            try {
+                error_log("🗑️  Iniciando exclusão do treino {$idTreino}...");
+
+                // 1. Primeiro excluir os exercícios do treino
+                $exercicios = $this->repository->buscarExerciciosDoTreino($idTreino);
+                error_log("📊 Exercícios a excluir: " . count($exercicios));
+                
+                foreach ($exercicios as $exercicio) {
+                    $success = $this->repository->removerExercicioDoTreino($exercicio['idTreino_Exercicio']);
+                    if (!$success) {
+                        throw new Exception("Falha ao excluir exercício ID: " . $exercicio['idTreino_Exercicio']);
+                    }
                 }
+                error_log("✅ Exercícios excluídos");
+
+                // 2. Agora excluir o treino
+                $success = $this->repository->excluirTreino($idTreino);
+                if (!$success) {
+                    throw new Exception("Falha ao excluir treino do banco de dados");
+                }
+                error_log("✅ Treino excluído da tabela treinos");
 
                 $this->repository->commit();
-                
-                return [
-                    'success' => true,
-                    'soft_delete' => true,
-                    'message' => 'Treino desatribuído com sucesso'
-                ];
+                error_log("🎉 Transação concluída com sucesso");
+
+                return true;
 
             } catch (Exception $e) {
                 $this->repository->rollBack();
+                error_log("❌ Rollback realizado devido a erro: " . $e->getMessage());
                 throw $e;
+            }
+        }
+
+        public function desatribuirTreinoComHistorico($idTreino, $usuario){
+            // Verificar se o treino existe
+            $treino = $this->repository->buscarTreinoPorId($idTreino);
+            if (!$treino) {
+                throw new Exception("Treino não encontrado", 404);
+            }
+
+            // Verificar permissão
+            if (!$this->repository->verificarPermissaoTreino($idTreino, $usuario)) {
+                throw new Exception("Você não tem permissão para desatribuir este treino");
+            }
+
+            // Verificar se existem sessões/histórico
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_sessao WHERE idTreino = ?");
+            $stmt->execute([$idTreino]);
+            $temHistorico = $stmt->fetchColumn() > 0;
+
+            if ($temHistorico) {
+                // Se tem histórico, apenas desvincular o aluno
+                return $this->repository->desvincularTreinoDoAluno($idTreino);
+            } else {
+                // Se não tem histórico, excluir completamente
+                return $this->excluirTreino($idTreino, $usuario);
             }
         }
 
