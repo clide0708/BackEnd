@@ -467,10 +467,10 @@ class PerfilController
         try {
             require_once __DIR__ . '/../Services/TreinosService.php';
             $treinosService = new TreinosService();
-            $historico = $treinosService->getHistoricoTreinos($this->usuarioLogado);
+            $historico = $treinosService->getHistoricoTreinos($this->usuarioLogado, 30);
             
-            http_response_hcode(200);
-            echo json_encode(['success' => true, 'historico' => $historico]);
+            http_response_code(200);
+            echo json_encode(['success' => true, 'treinos' => $historico]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);

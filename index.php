@@ -1,6 +1,5 @@
 <?php
 // Cabeçalhos CORS
-// Cabeçalhos CORS
 
 $allowed_origins = [
     'https://www.clidefit.com.br',

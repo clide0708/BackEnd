@@ -166,7 +166,73 @@
                 throw new Exception("Você não tem permissão para excluir este treino");
             }
 
-            // Iniciar transação para excluir exercícios e treino
+            // VERIFICAR SE EXISTEM SESSÕES VINCULADAS
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM treino_sessao WHERE idTreino = ?");
+            $stmt->execute([$idTreino]);
+            $sessoesExistentes = $stmt->fetchColumn();
+
+            if ($sessoesExistentes > 0) {
+                // Se existem sessões, fazer "soft delete" - apenas desatribuir
+                return $this->desatribuirTreinoSoft($idTreino, $usuario);
+            } else {
+                // Se não existem sessões, fazer exclusão completa
+                return $this->excluirTreinoHard($idTreino, $usuario);
+            }
+        }
+
+        private function desatribuirTreinoSoft($idTreino, $usuario) {
+            // Iniciar transação para garantir consistência
+            $this->repository->beginTransaction();
+            
+            try {
+                $now = date('Y-m-d H:i:s');
+                
+                // 1. Buscar informações do treino antes de desatribuir
+                $treino = $this->repository->buscarTreinoPorId($idTreino);
+                if (!$treino) {
+                    throw new Exception("Treino não encontrado");
+                }
+                
+                $idAluno = $treino['idAluno'];
+                
+                // 2. Criar uma cópia do treino para o histórico (se necessário)
+                // Isso mantém o histórico intacto mesmo se o treino original for modificado
+                
+                // 3. Marcar o treino como desatribuído e inativo
+                $sql = "UPDATE treinos SET 
+                            idAluno = NULL, 
+                            data_ultima_modificacao = ?,
+                            status = 'desatribuido',
+                            ativo = 0
+                        WHERE idTreino = ? AND idPersonal = ?";
+                
+                $stmt = $this->db->prepare($sql);
+                $success = $stmt->execute([
+                    $now,
+                    $idTreino,
+                    $usuario['sub']
+                ]);
+
+                if (!$success) {
+                    throw new Exception("Falha ao desatribuir treino");
+                }
+
+                $this->repository->commit();
+                
+                return [
+                    'success' => true,
+                    'soft_delete' => true,
+                    'message' => 'Treino desatribuído com sucesso'
+                ];
+
+            } catch (Exception $e) {
+                $this->repository->rollBack();
+                throw $e;
+            }
+        }
+
+        private function excluirTreinoHard($idTreino, $usuario) {
+            // Exclusão completa (apenas se não tiver sessões)
             $this->repository->beginTransaction();
 
             try {
@@ -306,7 +372,7 @@
             return $this->repository->listarTreinosAlunoComPersonal($idAluno);
         }
 
-        public function buscarTreinoCompleto($idTreino) {
+        public function buscarTreinoCompleto($idTreino, $usuario) {
             $treino = $this->repository->buscarTreinoPorId($idTreino);
             if (!$treino) {
                 throw new Exception("Treino não encontrado");
@@ -426,33 +492,86 @@
             if (!$sessao) {
                 throw new Exception("Sessão não encontrada");
             }
-            // Calcular porcentagem baseada em progresso
+            
+            // CORREÇÃO: Calcular porcentagem corretamente
             $porcentagem = $this->calcularPorcentagemProgresso($progresso, $sessao['idTreino']);
-            $status = ($porcentagem >= 100) ? 'concluido' : 'em_progresso';  // Corrige status
+            
+            // CORREÇÃO: Definir status baseado na porcentagem
+            $status = ($porcentagem >= 90) ? 'concluido' : 'em_progresso'; // 90% ou mais = concluído
+            
             $data = [
                 'status' => $status,
                 'progresso_json' => $progresso,
                 'duracao_total' => $duracao,
                 'notas' => $notas,
-                'porcentagem_concluida' => $porcentagem  // Adiciona para histórico
+                'porcentagem_concluida' => $porcentagem  // CORREÇÃO: Garantir que seja salvo
             ];
+            
             $success = $this->repository->atualizarSessaoTreino($idSessao, $data);
             if (!$success) {
                 throw new Exception("Falha ao finalizar sessão");
             }
+            
+            // CORREÇÃO: Atualizar também a última sessão do treino
+            $this->repository->atualizarUltimaSessaoTreino($sessao['idTreino'], $idSessao);
+            
             return true;
         }
 
         private function calcularPorcentagemProgresso($progresso, $idTreino) {
-            $exerciciosTotais = $this->repository->contarExerciciosTreino($idTreino);
-            $exerciciosConcluidos = count($progresso['exercicios_concluidos'] ?? []);
-            $seriesTotais = $this->repository->somarSeriesTreino($idTreino);
-            $seriesConcluidas = $progresso['serieAtual'] ?? 0;
-            
-            $pctExercicios = ($exerciciosTotais > 0) ? ($exerciciosConcluidos / $exerciciosTotais) * 100 : 0;
-            $pctSeries = ($seriesTotais > 0) ? ($seriesConcluidas / $seriesTotais) * 100 : 0;
-            
-            return round(($pctExercicios + $pctSeries) / 2);  // Média simples
+            try {
+                // Buscar exercícios do treino
+                $exercicios = $this->repository->buscarExerciciosDoTreino($idTreino);
+                
+                if (empty($exercicios)) {
+                    return 0;
+                }
+                
+                $totalExercicios = count($exercicios);
+                $exIndex = $progresso['exIndex'] ?? 0;
+                $serieAtual = $progresso['serieAtual'] ?? 1;
+                $exerciciosConcluidos = count($progresso['exercicios_concluidos'] ?? []);
+                
+                // CORREÇÃO: Se todos os exercícios estão concluídos, é 100%
+                if ($exerciciosConcluidos >= $totalExercicios) {
+                    return 100;
+                }
+                
+                // CORREÇÃO: Se está no último exercício e na última série, é 100%
+                if ($exIndex >= $totalExercicios) {
+                    return 100;
+                }
+                
+                // Progresso por exercícios concluídos
+                $progressoExercicios = ($exerciciosConcluidos / $totalExercicios) * 100;
+                
+                // Progresso dentro do exercício atual
+                $progressoNoExercicioAtual = 0;
+                if ($exIndex < $totalExercicios && $exIndex >= 0) {
+                    $exercicioAtual = $exercicios[$exIndex];
+                    $seriesTotais = $exercicioAtual['series'] ?? 1;
+                    
+                    if ($seriesTotais > 0) {
+                        // CORREÇÃO: sérieAtual - 1 porque começamos na série 1
+                        $progressoNoExercicioAtual = (($serieAtual - 1) / $seriesTotais) * 100;
+                    }
+                }
+                
+                // CORREÇÃO: Cálculo mais preciso
+                // Peso maior para exercícios concluídos, menor para progresso dentro do exercício
+                if ($exerciciosConcluidos > 0) {
+                    $porcentagemTotal = $progressoExercicios + ($progressoNoExercicioAtual * 0.3);
+                } else {
+                    $porcentagemTotal = $progressoNoExercicioAtual;
+                }
+                
+                // CORREÇÃO: Garantir que não passe de 100% e arredondar
+                return min(round($porcentagemTotal), 100);
+                
+            } catch (Exception $e) {
+                error_log("Erro ao calcular porcentagem: " . $e->getMessage());
+                return 0;
+            }
         }
 
         public function getHistoricoTreinos($usuario, $dias = 30) {
@@ -460,15 +579,47 @@
         }
 
         public function getSessaoParaRetomar($idSessao) {
-            $sessao = $this->repository->buscarSessaoPorId($idSessao);
-            if (!$sessao || $sessao['status'] !== 'em_progresso') {
-                throw new Exception("Sessão não encontrada ou já concluída");
+            try {
+                error_log("Buscando sessão: " . $idSessao);
+        
+                $sessao = $this->repository->buscarSessaoPorId($idSessao);
+                error_log("Sessão encontrada: " . json_encode($sessao));
+                
+                if (!$sessao) {
+                    throw new Exception("Sessão não encontrada");
+                }
+                
+                // Buscar treino
+                $treino = $this->repository->buscarTreinoPorId($sessao['idTreino']);
+                error_log("Treino encontrado: " . json_encode($treino));
+                
+                if (!$treino) {
+                    throw new Exception("Treino não encontrado");
+                }
+                
+                // Buscar exercícios
+                $exercicios = $this->repository->buscarExerciciosDoTreino($sessao['idTreino']);
+                error_log("Exercícios encontrados: " . count($exercicios));
+                
+                $treino['exercicios'] = $exercicios;
+                
+                // Processar progresso
+                $progresso = json_decode($sessao['progresso_json'], true) ?? [
+                    'exIndex' => 0, 
+                    'serieAtual' => 1, 
+                    'exercicios_concluidos' => []
+                ];
+                
+                return [
+                    'sessao' => $sessao,
+                    'treino' => $treino,
+                    'progresso' => $progresso
+                ];
+                
+            } catch (Exception $e) {
+                error_log("Erro em getSessaoParaRetomar: " . $e->getMessage());
+                throw $e;
             }
-            $progresso = json_decode($sessao['progresso_json'], true);
-            return [
-                'sessao' => $sessao,
-                'progresso' => $progresso ?? ['exIndex' => 0, 'serieAtual' => 1, 'exercicios_concluidos' => []]
-            ];
         }
     }
 

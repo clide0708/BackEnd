@@ -47,15 +47,32 @@
         }
 
         public function buscarTreinoPorId($idTreino) {
-            $stmt = $this->db->prepare("
-                SELECT t.*, p.nome as nomePersonal, a.nome as nomeAluno
-                FROM treinos t
-                LEFT JOIN personal p ON t.idPersonal = p.idPersonal
-                LEFT JOIN alunos a ON t.idAluno = a.idAluno
-                WHERE t.idTreino = ?
-            ");
-            $stmt->execute([$idTreino]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT 
+                        t.*, 
+                        p.nome as nomePersonal, 
+                        a.nome as nomeAluno
+                    FROM treinos t
+                    LEFT JOIN personal p ON t.idPersonal = p.idPersonal
+                    LEFT JOIN alunos a ON t.idAluno = a.idAluno
+                    WHERE t.idTreino = ?
+                ");
+                $stmt->execute([$idTreino]);
+                $treino = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($treino) {
+                    // Garantir que campos importantes existam
+                    $treino['tipo_treino'] = $treino['tipo_treino'] ?? 'normal';
+                    $treino['exercicios'] = []; // Será preenchido depois
+                }
+                
+                return $treino;
+                
+            } catch (Exception $e) {
+                error_log("Erro ao buscar treino {$idTreino}: " . $e->getMessage());
+                return null;
+            }
         }
 
         public function atualizarTreino($idTreino, $data) {
@@ -188,16 +205,66 @@
         }
 
         public function buscarExerciciosDoTreino($idTreino) {
-            $stmt = $this->db->prepare("
-                SELECT te.*, e.nome, e.grupoMuscular, e.descricao, v.url as video_url
-                FROM treino_exercicio te
-                LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio
-                LEFT JOIN videos v ON te.idExercicio = v.idExercicio
-                WHERE te.idTreino = ?
-                ORDER BY te.ordem
-            ");
-            $stmt->execute([$idTreino]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT 
+                        te.idTreino_Exercicio,
+                        te.idTreino,
+                        te.idExercicio,
+                        te.series,
+                        te.repeticoes,
+                        te.carga,
+                        te.descanso,
+                        te.ordem,
+                        te.observacoes,
+                        e.nome,
+                        e.grupoMuscular,
+                        e.descricao,
+                        e.tipo_exercicio,
+                        e.visibilidade,
+                        e.idPersonal,
+                        v.url as video_url
+                    FROM treino_exercicio te
+                    INNER JOIN exercicios e ON te.idExercicio = e.idExercicio
+                    LEFT JOIN videos v ON e.idExercicio = v.idExercicio
+                    WHERE te.idTreino = ?
+                    ORDER BY te.ordem, te.idTreino_Exercicio
+                ");
+                
+                $stmt->execute([$idTreino]);
+                $exercicios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Formatar os dados para garantir estrutura consistente
+                $exerciciosFormatados = [];
+                foreach ($exercicios as $ex) {
+                    $exerciciosFormatados[] = [
+                        'id' => $ex['idTreino_Exercicio'],
+                        'idTreino_Exercicio' => $ex['idTreino_Exercicio'],
+                        'idTreino' => $ex['idTreino'],
+                        'idExercicio' => $ex['idExercicio'],
+                        'nome' => $ex['nome'],
+                        'grupoMuscular' => $ex['grupoMuscular'],
+                        'descricao' => $ex['descricao'],
+                        'series' => $ex['series'],
+                        'repeticoes' => $ex['repeticoes'],
+                        'carga' => $ex['carga'],
+                        'descanso' => $ex['descanso'],
+                        'ordem' => $ex['ordem'],
+                        'observacoes' => $ex['observacoes'],
+                        'video_url' => $ex['video_url'],
+                        'tipo_exercicio' => $ex['tipo_exercicio'],
+                        'visibilidade' => $ex['visibilidade'],
+                        'idPersonal' => $ex['idPersonal'],
+                        'informacoes' => $ex['observacoes'] ?: $ex['descricao']
+                    ];
+                }
+                
+                return $exerciciosFormatados;
+                
+            } catch (Exception $e) {
+                error_log("Erro ao buscar exercícios do treino {$idTreino}: " . $e->getMessage());
+                return [];
+            }
         }
 
         // public function buscarExerciciosDoTreino($idTreino) {
@@ -350,78 +417,171 @@
         }
 
         public function atualizarSessaoTreino($idSessao, $data) {
-            $sql = "UPDATE treino_sessao SET data_fim = NOW(), status = ?, progresso_json = ?, duracao_total = ?, notas = ? 
-                    WHERE idSessao = ?";
-            $stmt = $this->db->prepare($sql);
-            return $stmt->execute([
-                $data['status'],
-                json_encode($data['progresso_json'] ?? '{}'),
-                $data['duracao_total'] ?? 0,
-                $data['notas'] ?? null,
-                $idSessao
-            ]);
+            try {
+                $sql = "UPDATE treino_sessao SET 
+                            data_fim = NOW(), 
+                            status = ?, 
+                            progresso_json = ?, 
+                            duracao_total = ?, 
+                            notas = ?,
+                            porcentagem_concluida = ?  -- CORREÇÃO: Adicionar este campo
+                        WHERE idSessao = ?";
+                
+                $stmt = $this->db->prepare($sql);
+                return $stmt->execute([
+                    $data['status'],
+                    json_encode($data['progresso_json'] ?? '{}'),
+                    $data['duracao_total'] ?? 0,
+                    $data['notas'] ?? null,
+                    $data['porcentagem_concluida'] ?? 0,  // CORREÇÃO: Incluir porcentagem
+                    $idSessao
+                ]);
+            } catch (Exception $e) {
+                error_log("Erro ao atualizar sessão: " . $e->getMessage());
+                return false;
+            }
         }
+
+        // public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
+        //     $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
+            
+        //     $sql = "
+        //         SELECT 
+        //             ts.idSessao, 
+        //             ts.idTreino, 
+        //             ts.data_inicio, 
+        //             ts.data_fim, 
+        //             ts.status, 
+        //             ts.progresso_json, 
+        //             ts.duracao_total, 
+        //             ts.notas,
+        //             ts.porcentagem_concluida,
+        //             t.nome AS nome_treino, 
+        //             t.descricao, 
+        //             t.tipo_treino,
+        //             -- Nome do criador
+        //             CASE 
+        //                 WHEN t.idPersonal IS NOT NULL THEN p.nome
+        //                 WHEN t.idAluno IS NOT NULL THEN a.nome
+        //                 ELSE 'Usuário'
+        //             END AS nome_criador,
+        //             -- Primeiro exercício para thumbnail
+        //             (SELECT v.url FROM treino_exercicio te 
+        //             LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio 
+        //             LEFT JOIN videos v ON e.idExercicio = v.idExercicio 
+        //             WHERE te.idTreino = t.idTreino 
+        //             ORDER BY te.ordem LIMIT 1) AS primeiro_video_url
+        //         FROM treino_sessao ts
+        //         INNER JOIN treinos t ON ts.idTreino = t.idTreino
+        //         LEFT JOIN personal p ON t.idPersonal = p.idPersonal
+        //         LEFT JOIN alunos a ON t.idAluno = a.idAluno
+        //         WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
+        //         ORDER BY ts.data_inicio DESC
+        //     ";
+            
+        //     $stmt = $this->db->prepare($sql);
+        //     $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
+        //     $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        //     // Processar resultados
+        //     foreach ($resultados as &$resultado) {
+        //         $porcentagem = $resultado['porcentagem_concluida'] ?? 0;
+        //         $resultado['porcentagem_concluida'] = round($porcentagem);
+        //         $resultado['data_formatada'] = date('d/m', strtotime($resultado['data_inicio']));
+        //         $resultado['tipo_display'] = ($resultado['tipo_treino'] === 'adaptado') ? 'Adaptado' : 'Normal';
+                
+        //         // Garantir que o status esteja correto baseado na porcentagem
+        //         if ($resultado['status'] === 'concluido' && $porcentagem < 100) {
+        //             $resultado['status'] = 'em_progresso';
+        //         }
+        //     }
+
+        //     return $resultados;
+        // }
 
         public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
             $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
             
-            $sql = "
-                SELECT 
-                    ts.idSessao, ts.idTreino, ts.data_inicio, ts.data_fim, ts.status, 
-                    ts.progresso_json, ts.duracao_total, ts.notas,
-                    t.nome AS nome_treino, t.descricao, t.tipo_treino,
-                    -- Nome do criador (personal ou aluno)
-                    CASE 
-                        WHEN t.idPersonal IS NOT NULL THEN p.nome
-                        WHEN t.idAluno IS NOT NULL THEN a.nome
-                        ELSE 'Usuário desconhecido'
-                    END AS nome_criador,
-                    -- Primeiro exercício para thumbnail (URL do vídeo)
-                    v.url AS primeiro_video_url,
-                    e.nome AS primeiro_exercicio_nome,
-                    -- Cálculo de porcentagem baseado em progresso_json (simplificado)
-                    CASE 
-                        WHEN ts.status = 'concluido' THEN 100
-                        ELSE (
-                            COALESCE(
-                                JSON_UNQUOTE(JSON_EXTRACT(ts.progresso_json, '$.exercicios_concluidos')) / 
-                                (SELECT COUNT(*) FROM treino_exercicio tex WHERE tex.idTreino = ts.idTreino),
-                                0
-                            ) * 100 + 
-                            COALESCE(
-                                JSON_UNQUOTE(JSON_EXTRACT(ts.progresso_json, '$.serieAtual')) / 
-                                (SELECT MAX(series) FROM treino_exercicio tex WHERE tex.idTreino = ts.idTreino),
-                                0
-                            ) * 100
-                        ) / 2  -- Média entre exercícios e séries
-                    END AS porcentagem_concluida
-                FROM treino_sessao ts
-                INNER JOIN treinos t ON ts.idTreino = t.idTreino
-                LEFT JOIN personal p ON t.idPersonal = p.idPersonal  -- Correção: usar idPersonal
-                LEFT JOIN alunos a ON t.idAluno = a.idAluno  -- Correção: usar idAluno
-                LEFT JOIN treino_exercicio te ON t.idTreino = te.idTreino AND te.ordem = 1  -- Primeiro exercício (ordem 1)
-                LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio  -- Dados do exercício
-                LEFT JOIN videos v ON te.idExercicio = v.idExercicio  -- Vídeo do exercício
-                WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
-                ORDER BY ts.data_inicio DESC
-            ";
-            
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
-            $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            try {
+                $sql = "
+                    SELECT 
+                        ts.idSessao, 
+                        ts.idTreino, 
+                        ts.data_inicio, 
+                        ts.data_fim, 
+                        ts.status, 
+                        ts.progresso_json, 
+                        ts.duracao_total, 
+                        ts.notas,
+                        ts.porcentagem_concluida,  -- CORREÇÃO: Garantir que este campo é buscado
+                        t.nome AS nome_treino, 
+                        t.descricao, 
+                        t.tipo_treino,
+                        -- Nome do criador
+                        CASE 
+                            WHEN t.idPersonal IS NOT NULL THEN p.nome
+                            WHEN t.idAluno IS NOT NULL THEN a.nome
+                            ELSE 'Usuário'
+                        END AS nome_criador,
+                        -- Primeiro exercício para thumbnail
+                        (SELECT v.url FROM treino_exercicio te 
+                        LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio 
+                        LEFT JOIN videos v ON e.idExercicio = v.idExercicio 
+                        WHERE te.idTreino = t.idTreino 
+                        ORDER BY te.ordem LIMIT 1) AS primeiro_video_url
+                    FROM treino_sessao ts
+                    INNER JOIN treinos t ON ts.idTreino = t.idTreino
+                    LEFT JOIN personal p ON t.idPersonal = p.idPersonal
+                    LEFT JOIN alunos a ON t.idAluno = a.idAluno
+                    WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
+                    ORDER BY ts.data_inicio DESC
+                ";
+                
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
+                $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Processar resultados para ajustar status baseado em porcentagem
-            foreach ($resultados as &$resultado) {
-                $porcentagem = $resultado['porcentagem_concluida'] ?? 0;
-                if ($resultado['status'] === 'concluido' && $porcentagem < 100) {
-                    $resultado['status'] = 'em_progresso';  // Corrige status se progresso <100%
+                // CORREÇÃO: Processar resultados para garantir porcentagem correta
+                foreach ($resultados as &$resultado) {
+                    // Usar porcentagem salva no banco, se disponível
+                    $porcentagem = $resultado['porcentagem_concluida'] ?? 0;
+                    
+                    // Se não tem porcentagem salva, tentar calcular do progresso_json
+                    if ($porcentagem == 0 && !empty($resultado['progresso_json'])) {
+                        $progresso = json_decode($resultado['progresso_json'], true);
+                        if ($progresso) {
+                            // Cálculo simplificado de fallback
+                            $totalExercicios = $this->contarExerciciosTreino($resultado['idTreino']);
+                            $exerciciosConcluidos = count($progresso['exercicios_concluidos'] ?? []);
+                            
+                            if ($totalExercicios > 0) {
+                                $porcentagem = round(($exerciciosConcluidos / $totalExercicios) * 100);
+                            }
+                        }
+                    }
+                    
+                    // CORREÇÃO: Se a sessão está como concluída, garantir 100%
+                    if ($resultado['status'] === 'concluido' && $porcentagem < 100) {
+                        $porcentagem = 100;
+                    }
+                    
+                    // CORREÇÃO: Se a porcentagem é alta mas status não é concluído
+                    if ($porcentagem >= 90 && $resultado['status'] !== 'concluido') {
+                        $resultado['status'] = 'concluido';
+                        $porcentagem = 100;
+                    }
+                    
+                    $resultado['porcentagem_concluida'] = $porcentagem;
+                    $resultado['data_formatada'] = date('d/m', strtotime($resultado['data_inicio']));
+                    $resultado['tipo_display'] = ($resultado['tipo_treino'] === 'adaptado') ? 'Adaptado' : 'Normal';
                 }
-                $resultado['porcentagem_concluida'] = round($porcentagem);  // Arredonda para exibição
-                $resultado['data_formatada'] = date('d/m', strtotime($resultado['data_inicio']));  // Formato DD/MM
-                $resultado['tipo_display'] = ($resultado['tipo_treino'] === 'adaptado') ? 'Adaptado' : 'Normal';
-            }
 
-            return $resultados;
+                return $resultados;
+                
+            } catch (Exception $e) {
+                error_log("Erro ao buscar histórico: " . $e->getMessage());
+                return [];
+            }
         }
 
         public function buscarSessaoPorId($idSessao) {
@@ -440,6 +600,17 @@
             $stmt = $this->db->prepare("SELECT SUM(series) FROM treino_exercicio WHERE idTreino = ?");
             $stmt->execute([$idTreino]);
             return $stmt->fetchColumn() ?: 0;
+        }
+
+        public function atualizarUltimaSessaoTreino($idTreino, $idSessao) {
+            try {
+                $sql = "UPDATE treinos SET ultima_sessao_id = ? WHERE idTreino = ?";
+                $stmt = $this->db->prepare($sql);
+                return $stmt->execute([$idSessao, $idTreino]);
+            } catch (Exception $e) {
+                error_log("Erro ao atualizar última sessão do treino: " . $e->getMessage());
+                return false;
+            }
         }
     }
 
