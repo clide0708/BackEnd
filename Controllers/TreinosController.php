@@ -81,37 +81,35 @@
             }
         }
 
-        public function excluirTreino($idTreino) {
+        public function excluirTreino($idTreino){
             try {
                 $usuario = $this->obterUsuarioDoToken();
-                if (!$usuario || $usuario['tipo'] !== 'personal') {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Apenas personais podem excluir treinos']);
+                if (!$usuario) {
+                    http_response_code(401);
+                    echo json_encode(['success' => false, 'error' => 'Token inválido ou expirado']);
                     return;
                 }
 
-                // Verificar se o treino pertence a este personal
-                $stmt = $this->db->prepare("SELECT idTreino FROM treinos WHERE idTreino = ? AND idPersonal = ?");
-                $stmt->execute([$idTreino, $usuario['sub']]);
-                $treino = $stmt->fetch(PDO::FETCH_ASSOC);
+                // LOG para debug
+                error_log("Tentando excluir treino ID: " . $idTreino . " por usuário: " . $usuario['email']);
 
-                if (!$treino) {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Treino não encontrado ou você não tem permissão']);
-                    return;
+                $this->treinosService->excluirTreino($idTreino, $usuario);
+
+                // Verificar se realmente foi excluído
+                $treinoRepository = new TreinosRepository();
+                $treinoVerificado = $treinoRepository->buscarTreinoPorId($idTreino);
+
+                if ($treinoVerificado) {
+                    error_log("ERRO: Treino ID " . $idTreino . " ainda existe após exclusão!");
+                    throw new Exception("Falha na exclusão do treino - treino ainda existe no banco");
                 }
 
-                $resultado = $this->treinosService->excluirTreino($idTreino, $usuario);
-
-                // Mensagem diferente baseada no tipo de exclusão
-                $mensagem = $resultado['soft_delete'] 
-                    ? 'Treino desatribuído do aluno (histórico mantido)' 
-                    : 'Treino excluído completamente';
+                error_log("SUCESSO: Treino ID " . $idTreino . " excluído com sucesso");
 
                 http_response_code(200);
-                echo json_encode(['success' => true, 'message' => $mensagem, 'soft_delete' => $resultado['soft_delete']]);
-
+                echo json_encode(['success' => true, 'message' => 'Treino excluído com sucesso']);
             } catch (Exception $e) {
+                error_log("ERRO na exclusão do treino " . $idTreino . ": " . $e->getMessage());
                 $statusCode = $e->getCode() ?: 400;
                 http_response_code($statusCode);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
