@@ -574,6 +574,25 @@
             'controller' => 'PagamentosController',
             'method' => 'getHistoricoPagamentos'
         ],
+
+        // Rotas Conectar
+
+        'personais' => [
+            'controller' => 'ConnectPersonalController',
+        'method' => 'listarPersonais'
+        ],
+        'academias' => [
+            'controller' => 'ConnectPersonalController', 
+            'method' => 'listarAcademias'
+        ],
+        'convite' => [
+            'controller' => 'ConnectPersonalController',
+            'method' => 'enviarConvite'
+        ],
+        'meus-convites' => [
+            'controller' => 'ConnectPersonalController',
+            'method' => 'meusConvites'
+        ],
     ];
 
     // Mapeamento de controladores - ADICIONAR VideosController
@@ -589,7 +608,8 @@
         'PerfilController' => __DIR__ . '/../Controllers/PerfilController.php',
         'PlanosController' => __DIR__ . '/../Controllers/PlanosController.php',
         'PagamentosController' => __DIR__ . '/../Controllers/PagamentosController.php',
-        'VideosController' => __DIR__ . '/../Controllers/VideosController.php', // NOVO CONTROLLER
+        'VideosController' => __DIR__ . '/../Controllers/VideosController.php',
+        'ConectarPersonalController' => __DIR__ . '/../Controllers/ConectarPersonalController.php',
     ];
 
     // ATUALIZAR Rotas Públicas - Adicionar novas rotas públicas
@@ -628,22 +648,6 @@
         'planos/(\d+)',
         'exercicios/buscarTodos', // Tornar pública para facilitar desenvolvimento
         'exercicios/globais',     // Tornar pública
-    ];
-
-
-    // Mapeamento de controladores
-    $controller_paths = [
-        'CadastroController' => __DIR__ . '/../Controllers/CadastroController.php',
-        'AuthController' => __DIR__ . '/../Controllers/AuthController.php',
-        'ExerciciosController' => __DIR__ . '/../Controllers/ExerciciosController.php',
-        'ConfigController' => __DIR__ . '/../Config/ConfigController.php',
-        'AlimentosController' => __DIR__ . '/../Controllers/AlimentosController.php',
-        'TreinosController' => __DIR__ . '/../Controllers/TreinosController.php',
-        'ConvitesController' => __DIR__ . '/../Controllers/ConvitesController.php',
-        'RecuperacaoSenhaController' => __DIR__ . '/../Controllers/RecuperacaoSenhaController.php',
-        'PerfilController' => __DIR__ . '/../Controllers/PerfilController.php',
-        'PlanosController' => __DIR__ . '/../Controllers/PlanosController.php',
-        'PagamentosController' => __DIR__ . '/../Controllers/PagamentosController.php',
     ];
 
     // Função para despachar a requisição
