@@ -47,8 +47,7 @@ class ConfigController {
         $serverInfo = [
             "servidor" => $_SERVER['SERVER_NAME'] ?? 'N/A',
             "php_version" => PHP_VERSION,
-            "timestamp" => $timestamp,
-            "endpoint" => $_SERVER['REQUEST_URI'] ?? '/'
+            "timestamp" => $timestamp
         ];
 
         http_response_code(200);
