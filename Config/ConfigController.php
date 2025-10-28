@@ -70,7 +70,6 @@ class ConfigController {
             ],
             "endpoints" => [
                 "documentacao" => "Em breve",
-                "health_check" => "/health",
                 "versao" => "1.0.0"
             ]
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
