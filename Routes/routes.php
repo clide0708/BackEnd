@@ -585,6 +585,10 @@
             'controller' => 'ConnectPersonalController', 
             'method' => 'listarAcademias'
         ],
+        'academias-ativas' => [
+            'controller' => 'CadastroController',
+            'method' => 'listarAcademiasAtivas'
+        ],
         'convite' => [
             'controller' => 'ConnectPersonalController',
             'method' => 'enviarConvite'
@@ -646,8 +650,9 @@
         'perfil/academia',
         'planos',
         'planos/(\d+)',
-        'exercicios/buscarTodos', // Tornar pública para facilitar desenvolvimento
-        'exercicios/globais',     // Tornar pública
+        'exercicios/buscarTodos',
+        'exercicios/globais',
+        'academias-ativas',
     ];
 
     // Função para despachar a requisição

@@ -20,7 +20,30 @@
          * Endpoint POST /esqueci-senha
          */
         public function esqueciSenha($data) {
+            // Configurações CORS (mantenha as que já estão funcionando)
+            $allowed_origins = [
+                'https://www.clidefit.com.br',
+                'https://clidefit.com.br', 
+                'http://localhost:5173',
+            ];
+            
+            $http_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+            
+            if (in_array($http_origin, $allowed_origins)) {
+                header("Access-Control-Allow-Origin: " . $http_origin);
+            } else {
+                header("Access-Control-Allow-Origin: https://www.clidefit.com.br");
+            }
+            
+            header("Access-Control-Allow-Methods: POST, OPTIONS");
+            header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+            header("Access-Control-Allow-Credentials: true");
             header('Content-Type: application/json');
+
+            if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                http_response_code(200);
+                exit();
+            }
 
             $email = trim(strtolower($data['email'] ?? ''));
 
@@ -30,19 +53,19 @@
                 return;
             }
 
-            $existe = $this->emailExiste($email);
-
-            if (!$existe) {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'O e-mail informado não foi encontrado :(!']);
-                return;
-            }
-
-            $codigo = $this->gerarCodigo(6);
-            $tokenHash = hash_hmac('sha256', $codigo, $this->tokenSecret);
-            $expiresAt = (new DateTime('+15 minutes'))->format('Y-m-d H:i:s');
-
             try {
+                $existe = $this->emailExiste($email);
+
+                if (!$existe) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'O e-mail informado não foi encontrado!']);
+                    return;
+                }
+
+                $codigo = $this->gerarCodigo(6);
+                $tokenHash = hash_hmac('sha256', $codigo, $this->tokenSecret);
+                $expiresAt = (new DateTime('+15 minutes'))->format('Y-m-d H:i:s');
+
                 $this->limparTokensAntigos($email);
 
                 $stmt = $this->pdo->prepare("
@@ -51,6 +74,7 @@
                 ");
                 $stmt->execute([$email, $tokenHash, $expiresAt]);
 
+                // Tenta enviar o email
                 $this->enviarEmailCodigo($email, $codigo);
 
                 http_response_code(200);
@@ -58,9 +82,22 @@
                     'success' => true,
                     'message' => "Uma mensagem com o código e instruções foi enviada para '$email'."
                 ]);
+
             } catch (Exception $e) {
+                error_log("Erro no processo de recuperação para $email: " . $e->getMessage());
+                
+                // Mensagem mais amigável para o usuário
+                $errorMessage = 'Erro ao processar solicitação. ';
+                
+                if (strpos($e->getMessage(), 'SMTP') !== false || 
+                    strpos($e->getMessage(), 'email') !== false) {
+                    $errorMessage .= 'Problema temporário no envio de emails. Tente novamente em alguns minutos.';
+                } else {
+                    $errorMessage .= 'Tente novamente mais tarde.';
+                }
+                
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Erro ao processar solicitação: ' . $e->getMessage()]);
+                echo json_encode(['success' => false, 'error' => $errorMessage]);
             }
         }
 
@@ -68,7 +105,32 @@
          * Endpoint POST /resetar-senha
          */
         public function resetarSenha($data) {
+            // Configurações CORS específicas
+            $allowed_origins = [
+                'https://www.clidefit.com.br',
+                'https://clidefit.com.br', 
+                'http://localhost:5173',
+            ];
+            
+            $http_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+            
+            if (in_array($http_origin, $allowed_origins)) {
+                header("Access-Control-Allow-Origin: " . $http_origin);
+            } else {
+                // Fallback seguro
+                header("Access-Control-Allow-Origin: https://www.clidefit.com.br");
+            }
+            
+            header("Access-Control-Allow-Methods: POST, OPTIONS");
+            header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+            header("Access-Control-Allow-Credentials: true");
             header('Content-Type: application/json');
+
+            // Responder preflight OPTIONS
+            if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+                http_response_code(200);
+                exit();
+            }
 
             $email = trim(strtolower($data['email'] ?? ''));
             $codigo = trim($data['codigo'] ?? '');
@@ -151,14 +213,22 @@
         // --- Funções auxiliares ---
 
         private function emailExiste(string $email): bool {
-            $stmt = $this->pdo->prepare("SELECT 1 FROM alunos WHERE email = ? LIMIT 1");
+            // Verificar em alunos
+            $stmt = $this->pdo->prepare("SELECT 1 FROM alunos WHERE email = ? AND status_conta = 'Ativa' LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
 
-            $stmt = $this->pdo->prepare("SELECT 1 FROM personal WHERE email = ? LIMIT 1");
+            // Verificar em personal
+            $stmt = $this->pdo->prepare("SELECT 1 FROM personal WHERE email = ? AND status_conta = 'Ativa' LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
 
+            // Verificar em academias
+            $stmt = $this->pdo->prepare("SELECT 1 FROM academias WHERE email = ? AND status_conta = 'Ativa' LIMIT 1");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) return true;
+
+            // Verificar em devs
             $stmt = $this->pdo->prepare("SELECT 1 FROM devs WHERE email = ? LIMIT 1");
             $stmt->execute([$email]);
             if ($stmt->fetch()) return true;
@@ -185,6 +255,7 @@
             $mail = new PHPMailer(true);
 
             try {
+                // Configurações do servidor - COM DEBUG HABILITADO
                 $mail->isSMTP();
                 $mail->Host = $_ENV['SMTP_HOST'];
                 $mail->SMTPAuth = true;
@@ -192,30 +263,52 @@
                 $mail->Password = $_ENV['SMTP_PASS'];
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port = intval($_ENV['SMTP_PORT']);
-
-                // CONFIGURAÇÕES DE CHARSET (ADICIONE ESTAS LINHAS)
+                
+                // HABILITAR DEBUG PARA IDENTIFICAR O ERRO
+                $mail->SMTPDebug = 2; // Debug detalhado
+                $mail->Debugoutput = function($str, $level) {
+                    error_log("PHPMailer Debug: $str");
+                };
+                
+                // Configurações de charset e encoding
                 $mail->CharSet = 'UTF-8';
                 $mail->Encoding = 'base64';
                 $mail->setLanguage('pt_br', __DIR__ . '/../vendor/phpmailer/phpmailer/language/');
 
+                // Remetente
                 $mail->setFrom($_ENV['SMTP_FROM_EMAIL'], $_ENV['SMTP_FROM_NAME']);
+                $mail->addReplyTo($_ENV['SMTP_FROM_EMAIL'], $_ENV['SMTP_FROM_NAME']);
+                
+                // Destinatário
                 $mail->addAddress($email);
 
+                // Conteúdo do email
                 $mail->isHTML(true);
                 $mail->Subject = '🔐 Código de Recuperação de Senha - CLIDE Fit';
-                
-                // Template HTML bonito para o código de recuperação
                 $mail->Body = $this->criarTemplateCodigoRecuperacao($codigo);
                 $mail->AltBody = "Seu código de recuperação é: $codigo - Válido por 15 minutos.";
 
-                $mail->send();
+                // Tentar enviar
+                if (!$mail->send()) {
+                    $errorInfo = $mail->ErrorInfo;
+                    error_log("Falha ao enviar email para $email: " . $errorInfo);
+                    throw new Exception("Falha no envio do email: " . $errorInfo);
+                }
+                
+                error_log("✅ Email de recuperação enviado com sucesso para: $email");
+
             } catch (Exception $e) {
-                error_log("Erro ao enviar email de recuperação: " . $mail->ErrorInfo);
-                throw new Exception("Não foi possível enviar o email de recuperação.");
+                $errorDetails = "ERRO PHPMailer para $email: " . $e->getMessage();
+                if (isset($mail)) {
+                    $errorDetails .= " | ErrorInfo: " . $mail->ErrorInfo;
+                }
+                error_log($errorDetails);
+                throw new Exception("Não foi possível enviar o email de recuperação. Tente novamente mais tarde.");
             }
         }
 
         private function enviarEmailConfirmacaoSenha(string $email): void {
+            
             $mail = new PHPMailer(true);
 
             try {
@@ -227,7 +320,6 @@
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port = intval($_ENV['SMTP_PORT']);
 
-                // CONFIGURAÇÕES DE CHARSET (ADICIONE ESTAS LINHAS)
                 $mail->CharSet = 'UTF-8';
                 $mail->Encoding = 'base64';
                 $mail->setLanguage('pt_br', __DIR__ . '/../vendor/phpmailer/phpmailer/language/');
@@ -237,10 +329,8 @@
 
                 $mail->isHTML(true);
                 $mail->Subject = '✅ Senha Alterada com Sucesso - CLIDE Fit';
-                
-                // Template HTML para confirmação de senha alterada
                 $mail->Body = $this->criarTemplateConfirmacaoSenha();
-                $mail->AltBody = "Sua senha foi alterada com sucesso. Se você não realizou esta ação, entre em contato conosco imediatamente.";
+                $mail->AltBody = "Sua senha foi alterada com sucesso.";
 
                 $mail->send();
             } catch (Exception $e) {
@@ -569,14 +659,22 @@
         }
 
         private function atualizarSenhaUsuario(string $email, string $senhaHash): bool {
-            $stmt = $this->pdo->prepare("UPDATE alunos SET senha = ? WHERE email = ?");
+            // Atualizar em alunos
+            $stmt = $this->pdo->prepare("UPDATE alunos SET senha = ? WHERE email = ? AND status_conta = 'Ativa'");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;
 
-            $stmt = $this->pdo->prepare("UPDATE personal SET senha = ? WHERE email = ?");
+            // Atualizar em personal
+            $stmt = $this->pdo->prepare("UPDATE personal SET senha = ? WHERE email = ? AND status_conta = 'Ativa'");
+            $stmt->execute([$senhaHash, $email]);
+            if ($stmt->rowCount() > 0) return true;
+
+            // Atualizar em academias
+            $stmt = $this->pdo->prepare("UPDATE academias SET senha = ? WHERE email = ? AND status_conta = 'Ativa'");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;
             
+            // Atualizar em devs
             $stmt = $this->pdo->prepare("UPDATE devs SET senha = ? WHERE email = ?");
             $stmt->execute([$senhaHash, $email]);
             if ($stmt->rowCount() > 0) return true;

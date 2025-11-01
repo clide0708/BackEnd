@@ -98,6 +98,14 @@
                             ];
                             break;
                         case 'personal':
+                            // Buscar dados da academia se existir
+                            $academia = null;
+                            if ($usuario['idAcademia']) {
+                                $stmtAcademia = $this->db->prepare("SELECT nome, idAcademia FROM academias WHERE idAcademia = ?");
+                                $stmtAcademia->execute([$usuario['idAcademia']]);
+                                $academia = $stmtAcademia->fetch(PDO::FETCH_ASSOC);
+                            }
+
                             $userData = [
                                 'id' => $usuario['idPersonal'],
                                 'tipo' => $tipo,
@@ -111,15 +119,19 @@
                                 'numTel' => $usuario['numTel'],
                                 'data_cadastro' => $usuario['data_cadastro'],
                                 'idPlano' => $usuario['idPlano'],
-                                'status_conta' => $usuario['status_conta']
+                                'status_conta' => $usuario['status_conta'],
+                                'idAcademia' => $usuario['idAcademia'],
+                                'academia' => $academia // Incluir dados completos da academia
                             ];
+                            
                             $payload = [
                                 'sub' => $userData['id'],
                                 'tipo' => $tipo,
                                 'nome' => $userData['nome'],
                                 'email' => $userData['email'],
                                 'cref_numero' => $userData['cref_numero'],
-                                'idPlano' => $userData['idPlano']
+                                'idPlano' => $userData['idPlano'],
+                                'idAcademia' => $userData['idAcademia']
                             ];
                             break;
                         case 'academia':
