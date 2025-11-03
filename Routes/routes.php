@@ -665,6 +665,16 @@
             'controller' => 'AcademiaController',
             'method' => 'desvincularUsuario'
         ],
+
+        // Rotas para Endereço
+        'endereco/([^/]+)' => [
+            'controller' => 'EnderecoController',
+            'method' => 'getEnderecoPorEmail'
+        ],
+        'endereco/atualizar' => [
+            'controller' => 'EnderecoController',
+            'method' => 'atualizarEndereco'
+        ],
     ];
 
     // Mapeamento de controladores - ADICIONAR VideosController
@@ -684,6 +694,7 @@
         'ConectarPersonalController' => __DIR__ . '/../Controllers/ConectarPersonalController.php',
         'UploadController' => __DIR__ . '/../Controllers/UploadController.php',
         'AcademiasController' => __DIR__ . '/../Controllers/AcademiasController.php',
+        'EnderecoController' => __DIR__ . '/../Controllers/EnderecoController.php',
     ];
 
     // ATUALIZAR Rotas Públicas - Adicionar novas rotas públicas
@@ -742,6 +753,8 @@
         'academia/solicitacao/(\d+)/aceitar', 
         'academia/solicitacao/(\d+)/recusar',
         'academia/desvincular',
+        'endereco/([^/]+)',
+        'endereco/atualizar',
     ];
 
     // Função para despachar a requisição
@@ -817,6 +830,8 @@
             'academia/solicitacao/(\d+)/aceitar', 
             'academia/solicitacao/(\d+)/recusar',
             'academia/desvincular',
+            'endereco/([^/]+)',
+            'endereco/atualizar',
         ];
 
         // Se a rota não for pública, exige autenticação

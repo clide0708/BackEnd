@@ -22,7 +22,6 @@
                 // Obter usuário autenticado
                 $usuario = $this->getUsuarioFromToken();
                 
-                // ⭐⭐ CORREÇÃO: Verificação mais robusta
                 if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
                     http_response_code(403);
                     echo json_encode([
@@ -32,9 +31,19 @@
                     return;
                 }
 
-                error_log("🎯 listarPersonais chamado por: " . $usuario['tipo'] . " ID: " . $usuario['id']);
+                // Obter filtros
+                $filtros = $this->obterFiltrosDaRequisicao();
+                error_log("🎯 Filtros recebidos em listarPersonais: " . json_encode($filtros));
 
-                // Query SIMPLIFICADA para testar
+                // ⭐⭐ OTIMIZAÇÃO: Obter localização apenas se necessário
+                $localizacaoUsuario = null;
+                $usarLocalizacao = !empty($filtros['raio_km']) && $filtros['raio_km'] > 0;
+                
+                if ($usarLocalizacao) {
+                    $localizacaoUsuario = $this->obterLocalizacaoUsuario($usuario, $filtros);
+                }
+
+                // ⭐⭐ OTIMIZAÇÃO: Query base simplificada inicialmente
                 $sql = "
                     SELECT 
                         p.idPersonal,
@@ -42,47 +51,86 @@
                         p.foto_perfil,
                         p.genero,
                         p.idade,
+                        p.data_nascimento,
                         CONCAT(p.cref_numero, '-', p.cref_categoria, '/', p.cref_regional) as cref,
                         p.cref_categoria as cref_tipo,
                         p.treinos_adaptados,
                         p.sobre,
                         e.cidade,
-                        e.estado
+                        e.estado,
+                        e.latitude,
+                        e.longitude
                     FROM personal p
                     LEFT JOIN enderecos_usuarios e ON p.idPersonal = e.idUsuario AND e.tipoUsuario = 'personal'
                     WHERE p.status_conta = 'Ativa'
-                    ORDER BY p.nome ASC
                 ";
 
-                error_log("🔍 SQL Personais Simplificado: " . $sql);
+                $params = [];
+                $conditions = [];
 
-                $stmt = $this->db->prepare($sql);
-                $stmt->execute();
-                $personais = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                // Aplicar filtros básicos primeiro (mais seletivos)
+                $this->aplicarFiltrosComuns($sql, $conditions, $params, $filtros, 'personal');
+                $this->aplicarFiltrosPersonal($sql, $conditions, $params, $filtros);
 
-                error_log("✅ Personais encontrados no BD: " . count($personais));
-                
-                if (count($personais) > 0) {
-                    error_log("📝 Primeiro personal: " . json_encode($personais[0]));
-                } else {
-                    error_log("📝 Nenhum personal encontrado");
+                if (!empty($conditions)) {
+                    $sql .= " AND " . implode(" AND ", $conditions);
                 }
 
-                // Processar resultados
+                // ⭐⭐ OTIMIZAÇÃO: Ordenar por ID inicialmente para resposta rápida
+                $sql .= " ORDER BY p.idPersonal DESC LIMIT 100";
+
+                error_log("🔍 SQL Personais (Otimizado): " . $sql);
+                error_log("📊 Parâmetros Personais: " . json_encode($params));
+
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute($params);
+                $personais = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // ⭐⭐ OTIMIZAÇÃO: Processar modalidades em lote separado
+                if (!empty($personais)) {
+                    $idsPersonais = array_column($personais, 'idPersonal');
+                    $modalidadesPorPersonal = $this->obterModalidadesEmLote($idsPersonais, 'personal');
+                    
+                    // Buscar contagem de treinos em lote
+                    $treinosCountPorPersonal = $this->obterContagemTreinosEmLote($idsPersonais);
+                }
+
+                // Processar resultados com cálculo de distância
                 $resultados = [];
                 foreach ($personais as $personal) {
-                    // Verificar convite pendente de forma segura
-                    $convitePendente = false;
-                    try {
-                        $convitePendente = $this->verificarConvitePendente(
-                            $usuario['id'], 
-                            'aluno', 
-                            $personal['idPersonal'], 
-                            'personal'
+                    // Calcular distância se necessário
+                    $distancia = null;
+                    $precisao_distancia = null;
+                    
+                    if ($usarLocalizacao && $localizacaoUsuario && 
+                        $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude'] &&
+                        $personal['latitude'] && $personal['longitude']) {
+                        
+                        $distancia = $this->calcularDistancia(
+                            $localizacaoUsuario['latitude'],
+                            $localizacaoUsuario['longitude'],
+                            $personal['latitude'],
+                            $personal['longitude']
                         );
-                    } catch (Exception $e) {
-                        error_log("⚠️ Erro ao verificar convite: " . $e->getMessage());
+
+                        $precisao_distancia = $localizacaoUsuario['precisao'] ?? 'media';
+
+                        // Aplicar filtro de raio
+                        if ($distancia > $filtros['raio_km']) {
+                            continue;
+                        }
                     }
+
+                    // Verificar convite pendente
+                    $convitePendente = $this->verificarConvitePendente(
+                        $usuario['id'], 
+                        'aluno', 
+                        $personal['idPersonal'], 
+                        'personal'
+                    );
+
+                    // Processar modalidades do lote
+                    $modalidades = $modalidadesPorPersonal[$personal['idPersonal']] ?? [];
 
                     $resultados[] = [
                         'idPersonal' => $personal['idPersonal'],
@@ -96,23 +144,33 @@
                         'sobre' => $personal['sobre'],
                         'cidade' => $personal['cidade'],
                         'estado' => $personal['estado'],
-                        'modalidades' => [], // Simplificado por enquanto
-                        'distancia_km' => null, // Simplificado por enquanto
-                        'convitePendente' => $convitePendente
+                        'modalidades' => $modalidades,
+                        'treinos_count' => $treinosCountPorPersonal[$personal['idPersonal']] ?? 0,
+                        'distancia_km' => $distancia,
+                        'precisao_distancia' => $precisao_distancia,
+                        'convitePendente' => $convitePendente,
+                        'possui_localizacao' => !empty($personal['latitude']) && !empty($personal['longitude'])
                     ];
                 }
 
-                error_log("🎯 Personais resultados finais: " . count($resultados));
+                // ⭐⭐ OTIMIZAÇÃO: Ordenar por distância se aplicável
+                if ($usarLocalizacao && $localizacaoUsuario) {
+                    usort($resultados, function($a, $b) {
+                        return ($a['distancia_km'] ?? 9999) <=> ($b['distancia_km'] ?? 9999);
+                    });
+                }
 
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
                     'data' => $resultados,
                     'total' => count($resultados),
+                    'localizacao_usuario' => $localizacaoUsuario,
                     'debug' => [
-                        'query_simplificada' => true,
-                        'personais_encontrados' => count($personais),
-                        'resultados_processados' => count($resultados)
+                        'filtros_recebidos' => $filtros,
+                        'query_executada' => $sql,
+                        'parametros_query' => $params,
+                        'tempo_processamento' => microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]
                     ]
                 ]);
 
@@ -141,10 +199,8 @@
             header('Content-Type: application/json');
 
             try {
-                // Obter usuário autenticado
                 $usuario = $this->getUsuarioFromToken();
                 
-                // ⭐⭐ CORREÇÃO: Verificação mais robusta
                 if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
                     http_response_code(403);
                     echo json_encode([
@@ -154,9 +210,14 @@
                     return;
                 }
 
-                error_log("🎯 listarAlunos chamado por: " . $usuario['tipo'] . " ID: " . $usuario['id']);
+                // ⭐⭐ CORREÇÃO: Obter filtros da query string
+                $filtros = $this->obterFiltrosDaRequisicao();
+                error_log("🎯 Filtros recebidos em listarAlunos: " . json_encode($filtros));
 
-                // Query SIMPLIFICADA para testar
+                // Obter localização do usuário para cálculo de distância
+                $localizacaoUsuario = $this->obterLocalizacaoUsuario($usuario, $filtros);
+
+                // Construir query base
                 $sql = "
                     SELECT DISTINCT
                         a.idAluno,
@@ -164,6 +225,7 @@
                         a.foto_perfil,
                         a.genero,
                         a.idade,
+                        a.data_nascimento,
                         a.altura,
                         a.peso,
                         a.meta,
@@ -172,43 +234,82 @@
                         a.idPersonal,
                         a.status_conta,
                         e.cidade,
-                        e.estado
+                        e.estado,
+                        e.latitude,
+                        e.longitude,
+                        GROUP_CONCAT(DISTINCT m.nome) as modalidades_nomes,
+                        ac.nome as nome_academia,
+                        ac.idAcademia
                     FROM alunos a
                     LEFT JOIN enderecos_usuarios e ON a.idAluno = e.idUsuario AND e.tipoUsuario = 'aluno'
+                    LEFT JOIN modalidades_aluno ma ON a.idAluno = ma.idAluno
+                    LEFT JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                    LEFT JOIN academias ac ON a.idAcademia = ac.idAcademia
                     WHERE a.status_conta = 'Ativa' 
                     AND a.idPersonal IS NULL
-                    ORDER BY a.data_cadastro DESC
                 ";
 
-                error_log("🔍 SQL Alunos Simplificado: " . $sql);
+                $params = [];
+                $conditions = [];
 
-                $stmt = $this->db->prepare($sql);
-                $stmt->execute();
-                $alunos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                // ⭐⭐ CORREÇÃO: Aplicar filtros corretamente
+                $this->aplicarFiltrosComuns($sql, $conditions, $params, $filtros, 'aluno');
+                $this->aplicarFiltrosAluno($sql, $conditions, $params, $filtros);
 
-                error_log("✅ Alunos encontrados no BD: " . count($alunos));
-                
-                // Log dos primeiros alunos para debug
-                if (count($alunos) > 0) {
-                    error_log("📝 Primeiro aluno: " . json_encode($alunos[0]));
-                } else {
-                    error_log("📝 Nenhum aluno encontrado com os critérios");
+                if (!empty($conditions)) {
+                    $sql .= " AND " . implode(" AND ", $conditions);
                 }
 
-                // Processar resultados
+                $sql .= " GROUP BY a.idAluno, e.idEndereco ";
+                
+                // Ordenar por distância se houver localização de referência
+                if ($localizacaoUsuario && $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude']) {
+                    $sql .= " ORDER BY calcular_distancia_aproximada(?, ?, e.latitude, e.longitude) ASC";
+                    array_unshift($params, $localizacaoUsuario['latitude'], $localizacaoUsuario['longitude']);
+                } else {
+                    $sql .= " ORDER BY a.data_cadastro DESC";
+                }
+
+                error_log("🔍 SQL Alunos: " . $sql);
+                error_log("📊 Parâmetros Alunos: " . json_encode($params));
+
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute($params);
+                $alunos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Processar resultados com cálculo de distância
                 $resultados = [];
                 foreach ($alunos as $aluno) {
-                    // Verificar convite pendente de forma segura
-                    $convitePendente = false;
-                    try {
-                        $convitePendente = $this->verificarConvitePendente(
-                            $usuario['id'], 
-                            'personal', 
-                            $aluno['idAluno'], 
-                            'aluno'
+                    // Calcular distância se tivermos coordenadas
+                    $distancia = null;
+                    if ($localizacaoUsuario && $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude'] &&
+                        $aluno['latitude'] && $aluno['longitude']) {
+                        
+                        $distancia = $this->calcularDistancia(
+                            $localizacaoUsuario['latitude'],
+                            $localizacaoUsuario['longitude'],
+                            $aluno['latitude'],
+                            $aluno['longitude']
                         );
-                    } catch (Exception $e) {
-                        error_log("⚠️ Erro ao verificar convite: " . $e->getMessage());
+
+                        // Aplicar filtro de raio se especificado
+                        if (!empty($filtros['raio_km']) && $filtros['raio_km'] > 0 && $distancia > $filtros['raio_km']) {
+                            continue; // Pular alunos fora do raio
+                        }
+                    }
+
+                    // Verificar convite pendente
+                    $convitePendente = $this->verificarConvitePendente(
+                        $usuario['id'], 
+                        'personal', 
+                        $aluno['idAluno'], 
+                        'aluno'
+                    );
+
+                    // Processar modalidades
+                    $modalidades = [];
+                    if (!empty($aluno['modalidades_nomes'])) {
+                        $modalidades = explode(',', $aluno['modalidades_nomes']);
                     }
 
                     $resultados[] = [
@@ -224,27 +325,24 @@
                         'treinoTipo' => $aluno['treinoTipo'],
                         'cidade' => $aluno['cidade'],
                         'estado' => $aluno['estado'],
-                        'modalidades' => [], // Simplificado por enquanto
-                        'distancia_km' => null, // Simplificado por enquanto
-                        'convitePendente' => $convitePendente
+                        'modalidades' => $modalidades,
+                        'nomeAcademia' => $aluno['nome_academia'],
+                        'distancia_km' => $distancia,
+                        'convitePendente' => $convitePendente,
+                        'possui_localizacao' => !empty($aluno['latitude']) && !empty($aluno['longitude'])
                     ];
                 }
-
-                error_log("🎯 Resultados finais para retorno: " . count($resultados));
 
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
                     'data' => $resultados,
                     'total' => count($resultados),
+                    'localizacao_usuario' => $localizacaoUsuario,
                     'debug' => [
-                        'query_simplificada' => true,
-                        'alunos_encontrados' => count($alunos),
-                        'resultados_processados' => count($resultados),
-                        'usuario_requisitante' => [
-                            'id' => $usuario['id'],
-                            'tipo' => $usuario['tipo']
-                        ]
+                        'filtros_recebidos' => $filtros,
+                        'query_executada' => $sql,
+                        'parametros_query' => $params
                     ]
                 ]);
 
@@ -263,6 +361,32 @@
                     'error' => 'Erro interno: ' . $e->getMessage()
                 ]);
             }
+        }
+
+        private function obterFiltrosDaRequisicao()
+        {
+            $filtros = [
+                'academia_id' => $_GET['academia_id'] ?? '',
+                'genero' => $_GET['genero'] ?? '',
+                'localizacao' => $_GET['localizacao'] ?? '',
+                'modalidades' => isset($_GET['modalidades']) ? explode(',', $_GET['modalidades']) : [],
+                'treinosAdaptados' => $_GET['treinosAdaptados'] ?? '',
+                
+                // ⭐⭐ CORREÇÃO: Garantir que idade_min e idade_max sejam números
+                'idade_min' => isset($_GET['idade_min']) && is_numeric($_GET['idade_min']) ? (int)$_GET['idade_min'] : '',
+                'idade_max' => isset($_GET['idade_max']) && is_numeric($_GET['idade_max']) ? (int)$_GET['idade_max'] : '',
+                
+                'meta' => $_GET['meta'] ?? '',
+                'cref_tipo' => $_GET['cref_tipo'] ?? '',
+                'raio_km' => isset($_GET['raio_km']) ? (int)$_GET['raio_km'] : 50,
+                'latitude' => $_GET['latitude'] ?? null,
+                'longitude' => $_GET['longitude'] ?? null
+            ];
+
+            // Log para debug
+            error_log("🎯 Filtros extraídos: " . json_encode($filtros));
+
+            return $filtros;
         }
 
         /**
@@ -420,6 +544,59 @@
             }
         }
 
+        private function obterContagemTreinosEmLote($idsPersonais)
+        {
+            if (empty($idsPersonais)) return [];
+            
+            $placeholders = str_repeat('?,', count($idsPersonais) - 1) . '?';
+            
+            $sql = "
+                SELECT idPersonal, COUNT(*) as count
+                FROM treinos
+                WHERE idPersonal IN ({$placeholders})
+                GROUP BY idPersonal
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($idsPersonais);
+            $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $contagemPorPersonal = [];
+            foreach ($resultados as $linha) {
+                $contagemPorPersonal[$linha['idPersonal']] = (int)$linha['count'];
+            }
+            
+            return $contagemPorPersonal;
+        }
+
+        private function obterModalidadesEmLote($idsUsuarios, $tipoUsuario)
+        {
+            if (empty($idsUsuarios)) return [];
+            
+            $placeholders = str_repeat('?,', count($idsUsuarios) - 1) . '?';
+            $tabela = $tipoUsuario === 'personal' ? 'modalidades_personal' : 'modalidades_aluno';
+            $campoId = $tipoUsuario === 'personal' ? 'idPersonal' : 'idAluno';
+            
+            $sql = "
+                SELECT ma.{$campoId} as idUsuario, m.nome
+                FROM {$tabela} ma
+                JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                WHERE ma.{$campoId} IN ({$placeholders})
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($idsUsuarios);
+            $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Agrupar por usuário
+            $modalidadesPorUsuario = [];
+            foreach ($resultados as $linha) {
+                $modalidadesPorUsuario[$linha['idUsuario']][] = $linha['nome'];
+            }
+            
+            return $modalidadesPorUsuario;
+        }
+
         /**
          * Buscar modalidades disponíveis
          */
@@ -450,25 +627,6 @@
                     'error' => 'Erro no banco: ' . $e->getMessage()
                 ]);
             }
-        }
-
-        /**
-         * Helper para calcular distância entre coordenadas
-         */
-        private function calcularDistancia($lat1, $lon1, $lat2, $lon2)
-        {
-            $raioTerra = 6371; // Raio da Terra em km
-
-            $dLat = deg2rad($lat2 - $lat1);
-            $dLon = deg2rad($lon2 - $lon1);
-
-            $a = sin($dLat/2) * sin($dLat/2) + 
-                cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * 
-                sin($dLon/2) * sin($dLon/2);
-            
-            $c = 2 * atan2(sqrt($a), sqrt(1-$a));
-            
-            return round($raioTerra * $c, 2);
         }
 
         /**
@@ -542,6 +700,313 @@
             }
             
             return null;
+        }
+
+        private function obterEnderecoCompletoUsuario($usuario)
+        {
+            $stmt = $this->db->prepare("
+                SELECT eu.* 
+                FROM enderecos_usuarios eu
+                WHERE eu.idUsuario = ? AND eu.tipoUsuario = ?
+            ");
+            $stmt->execute([$usuario['id'], $usuario['tipo']]);
+            $endereco = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($endereco && $endereco['cep'] && $endereco['numero']) {
+                // Tentar obter coordenadas se não tiver
+                if (!$endereco['latitude'] || !$endereco['longitude']) {
+                    $coordenadas = $this->obterCoordenadasPorEnderecoCompleto($endereco);
+                    if ($coordenadas) {
+                        // Atualizar coordenadas no banco
+                        $this->atualizarCoordenadasEndereco(
+                            $endereco['idEndereco'], 
+                            $coordenadas['latitude'], 
+                            $coordenadas['longitude']
+                        );
+                        $endereco['latitude'] = $coordenadas['latitude'];
+                        $endereco['longitude'] = $coordenadas['longitude'];
+                    }
+                }
+            }
+            
+            return $endereco;
+        }
+
+        private function obterCoordenadasPorEnderecoCompleto($endereco)
+        {
+            try {
+                $enderecoCompleto = implode(', ', array_filter([
+                    $endereco['logradouro'],
+                    $endereco['numero'],
+                    $endereco['bairro'],
+                    $endereco['cidade'],
+                    $endereco['estado'],
+                    'Brasil'
+                ]));
+                
+                return $this->geocodificarEndereco($enderecoCompleto);
+                
+            } catch (Exception $e) {
+                error_log("Erro ao geocodificar endereço completo: " . $e->getMessage());
+                return null;
+            }
+        }
+
+        private function atualizarCoordenadasEndereco($idEndereco, $latitude, $longitude)
+        {
+            try {
+                $stmt = $this->db->prepare("
+                    UPDATE enderecos_usuarios 
+                    SET latitude = ?, longitude = ?, data_atualizacao = NOW()
+                    WHERE idEndereco = ?
+                ");
+                $stmt->execute([$latitude, $longitude, $idEndereco]);
+                return true;
+            } catch (Exception $e) {
+                error_log("Erro ao atualizar coordenadas: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function formatarEndereco($endereco)
+        {
+            return implode(', ', array_filter([
+                $endereco['logradouro'],
+                $endereco['numero'],
+                $endereco['bairro'],
+                $endereco['cidade'],
+                $endereco['estado']
+            ]));
+        }
+
+        private function obterLocalizacaoUsuario($usuario, $filtros)
+        {
+            $localizacao = null;
+
+            // 1. Tentar usar coordenadas fornecidas (geolocalização)
+            if (!empty($filtros['latitude']) && !empty($filtros['longitude'])) {
+                return [
+                    'latitude' => (float)$filtros['latitude'],
+                    'longitude' => (float)$filtros['longitude'],
+                    'tipo' => 'geolocalizacao',
+                    'endereco' => 'Localização atual',
+                    'precisao' => 'alta'
+                ];
+            }
+
+            // 2. Tentar usar endereço cadastrado do usuário COM NÚMERO
+            $enderecoUsuario = $this->obterEnderecoCompletoUsuario($usuario);
+            
+            if ($enderecoUsuario && $enderecoUsuario['cep'] && $enderecoUsuario['numero']) {
+                if ($enderecoUsuario['latitude'] && $enderecoUsuario['longitude']) {
+                    return [
+                        'latitude' => (float)$enderecoUsuario['latitude'],
+                        'longitude' => (float)$enderecoUsuario['longitude'],
+                        'tipo' => 'endereco_cadastrado',
+                        'endereco' => $this->formatarEndereco($enderecoUsuario),
+                        'precisao' => 'media'
+                    ];
+                } else {
+                    // Tentar geocodificar endereço completo
+                    $coordenadas = $this->obterCoordenadasPorEnderecoCompleto($enderecoUsuario);
+                    if ($coordenadas) {
+                        return [
+                            'latitude' => $coordenadas['latitude'],
+                            'longitude' => $coordenadas['longitude'],
+                            'tipo' => 'endereco_geocodificado',
+                            'endereco' => $this->formatarEndereco($enderecoUsuario),
+                            'precisao' => 'media'
+                        ];
+                    }
+                }
+            }
+
+            // 3. Tentar geocodificar localização textual do filtro
+            if (!empty($filtros['localizacao'])) {
+                $coordenadas = $this->geocodificarEndereco($filtros['localizacao']);
+                if ($coordenadas) {
+                    return [
+                        'latitude' => $coordenadas['latitude'],
+                        'longitude' => $coordenadas['longitude'],
+                        'tipo' => 'endereco_digitado',
+                        'endereco' => $filtros['localizacao'],
+                        'precisao' => 'baixa'
+                    ];
+                }
+            }
+
+            // 4. Fallback: usar apenas cidade/estado do endereço cadastrado
+            if ($enderecoUsuario && $enderecoUsuario['cidade'] && $enderecoUsuario['estado']) {
+                $localizacaoFallback = $enderecoUsuario['cidade'] . ', ' . $enderecoUsuario['estado'];
+                $coordenadas = $this->geocodificarEndereco($localizacaoFallback);
+                
+                if ($coordenadas) {
+                    return [
+                        'latitude' => $coordenadas['latitude'],
+                        'longitude' => $coordenadas['longitude'],
+                        'tipo' => 'endereco_aproximado',
+                        'endereco' => $localizacaoFallback,
+                        'precisao' => 'baixa'
+                    ];
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * Obter endereço cadastrado do usuário
+         */
+        private function obterEnderecoUsuario($idUsuario, $tipoUsuario)
+        {
+            $stmt = $this->db->prepare("
+                SELECT logradouro, cidade, estado, latitude, longitude 
+                FROM enderecos_usuarios 
+                WHERE idUsuario = ? AND tipoUsuario = ?
+            ");
+            $stmt->execute([$idUsuario, $tipoUsuario]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        /**
+         * Geocodificar endereço para coordenadas
+         */
+        private function geocodificarEndereco($endereco)
+        {
+            try {
+                // Usar API do Nominatim (OpenStreetMap) - gratuita
+                $url = "https://nominatim.openstreetmap.org/search?format=json&q=" . urlencode($endereco) . "&limit=1&countrycodes=br";
+                
+                $context = stream_context_create([
+                    'http' => [
+                        'header' => "User-Agent: ClideFit App\r\n"
+                    ]
+                ]);
+                
+                $response = file_get_contents($url, false, $context);
+                $data = json_decode($response, true);
+                
+                if (!empty($data) && isset($data[0]['lat']) && isset($data[0]['lon'])) {
+                    return [
+                        'latitude' => (float)$data[0]['lat'],
+                        'longitude' => (float)$data[0]['lon']
+                    ];
+                }
+            } catch (Exception $e) {
+                error_log("Erro ao geocodificar endereço: " . $e->getMessage());
+            }
+            
+            return null;
+        }
+
+        /**
+         * Calcular distância usando fórmula de Haversine
+         */
+        private function calcularDistancia($lat1, $lon1, $lat2, $lon2)
+        {
+            $raioTerra = 6371; // Raio da Terra em km
+
+            $dLat = deg2rad($lat2 - $lat1);
+            $dLon = deg2rad($lon2 - $lon1);
+
+            $a = sin($dLat/2) * sin($dLat/2) + 
+                cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * 
+                sin($dLon/2) * sin($dLon/2);
+            
+            $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+            
+            return round($raioTerra * $c, 2);
+        }
+
+        public function obterCoordenadasPorCEP($cep)
+        {
+            try {
+                // Primeiro buscar endereço via ViaCEP
+                $viaCEPResponse = file_get_contents("https://viacep.com.br/ws/{$cep}/json/");
+                $viaCEPData = json_decode($viaCEPResponse, true);
+                
+                if (isset($viaCEPData['erro'])) {
+                    return null;
+                }
+                
+                // Montar endereço completo para geocodificação
+                $enderecoCompleto = $viaCEPData['logradouro'] . ', ' . $viaCEPData['localidade'] . ', ' . $viaCEPData['uf'] . ', Brasil';
+                
+                // Geocodificar para obter coordenadas
+                return $this->geocodificarEndereco($enderecoCompleto);
+                
+            } catch (Exception $e) {
+                error_log("Erro ao obter coordenadas por CEP: " . $e->getMessage());
+                return null;
+            }
+        }
+
+        private function aplicarFiltrosComuns(&$sql, &$conditions, &$params, $filtros, $tipoUsuario)
+        {
+            // Filtro por academia
+            if (!empty($filtros['academia_id'])) {
+                $conditions[] = ($tipoUsuario === 'aluno' ? 'a.idAcademia' : 'p.idAcademia') . " = ?";
+                $params[] = $filtros['academia_id'];
+            }
+
+            // Filtro por gênero
+            if (!empty($filtros['genero'])) {
+                $conditions[] = ($tipoUsuario === 'aluno' ? 'a.genero' : 'p.genero') . " = ?";
+                $params[] = $filtros['genero'];
+            }
+
+            // Filtro por treinos adaptados
+            if ($filtros['treinosAdaptados'] !== '') {
+                $conditions[] = ($tipoUsuario === 'aluno' ? 'a.treinos_adaptados' : 'p.treinos_adaptados') . " = ?";
+                $params[] = $filtros['treinosAdaptados'] === 'true' ? 1 : 0;
+            }
+
+            // Filtro por modalidades
+            if (!empty($filtros['modalidades'])) {
+                $placeholders = implode(',', array_fill(0, count($filtros['modalidades']), '?'));
+                $conditions[] = "m.nome IN ($placeholders)";
+                $params = array_merge($params, $filtros['modalidades']);
+            }
+
+            // Filtro por cidade/estado (quando não há coordenadas)
+            if (empty($filtros['latitude']) && empty($filtros['longitude']) && !empty($filtros['localizacao'])) {
+                $conditions[] = "(e.cidade LIKE ? OR e.estado LIKE ?)";
+                $params[] = '%' . $filtros['localizacao'] . '%';
+                $params[] = '%' . $filtros['localizacao'] . '%';
+            }
+        }
+
+        /**
+         * Aplicar filtros específicos para personais
+         */
+        private function aplicarFiltrosPersonal(&$sql, &$conditions, &$params, $filtros)
+        {
+            // Filtro por tipo CREF
+            if (!empty($filtros['cref_tipo'])) {
+                $conditions[] = "p.cref_categoria = ?";
+                $params[] = $filtros['cref_tipo'];
+            }
+        }
+
+        private function aplicarFiltrosAluno(&$sql, &$conditions, &$params, $filtros)
+        {
+            // Filtro por idade mínima
+            if (!empty($filtros['idade_min']) && is_numeric($filtros['idade_min'])) {
+                $conditions[] = "a.idade >= ?";
+                $params[] = (int)$filtros['idade_min'];
+            }
+
+            // ⭐⭐ CORREÇÃO: Filtro por idade máxima
+            if (!empty($filtros['idade_max']) && is_numeric($filtros['idade_max'])) {
+                $conditions[] = "a.idade <= ?";
+                $params[] = (int)$filtros['idade_max'];
+            }
+
+            // ⭐⭐ CORREÇÃO: Filtro por meta (busca parcial)
+            if (!empty($filtros['meta'])) {
+                $conditions[] = "a.meta LIKE ?";
+                $params[] = '%' . $filtros['meta'] . '%';
+            }
         }
     }
 

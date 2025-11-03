@@ -296,7 +296,8 @@
 
         public function cadastrarAcademia($data){
             try {
-                 $camposObrigatorios = ['nome', 'nome_fantasia', 'razao_social', 'cnpj', 'email', 'senha'];
+                // ⭐⭐ CORREÇÃO: Campos obrigatórios para academia
+                $camposObrigatorios = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'senha'];
                 foreach ($camposObrigatorios as $campo) {
                     if (!isset($data[$campo]) || empty(trim($data[$campo]))) {
                         http_response_code(400);
@@ -346,18 +347,20 @@
                     return;
                 }
 
-                 $stmt = $this->db->prepare("
+                // ⭐⭐ CORREÇÃO: Inserir apenas campos relevantes para academia
+                $stmt = $this->db->prepare("
                     INSERT INTO academias (nome, nome_fantasia, razao_social, cnpj, email, senha, telefone, data_cadastro, idPlano, status_conta) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'Ativa')
                 ");
 
+                // ⭐⭐ CORREÇÃO: Usar nome_fantasia como nome principal também
                 $success = $stmt->execute([
-                    trim($data['nome']),
-                    trim($data['nome_fantasia']),
-                    trim($data['razao_social']),
-                    $cnpjFormatado,
-                    trim($data['email']),
-                    $senhaHash,
+                    trim($data['nome_fantasia']), // nome
+                    trim($data['nome_fantasia']), // nome_fantasia
+                    trim($data['razao_social']),  // razao_social
+                    $cnpjFormatado,               // cnpj
+                    trim($data['email']),         // email
+                    $senhaHash,                   // senha
                     isset($data['telefone']) ? $this->formatarTelefone($data['telefone']) : null,
                     $idPlanoAcademia
                 ]);
