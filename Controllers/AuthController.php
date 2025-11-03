@@ -135,6 +135,13 @@
                             ];
                             break;
                         case 'academia':
+                            
+                            if ($usuario['status_conta'] !== 'Ativa') {
+                                http_response_code(403);
+                                echo json_encode(['success' => false, 'error' => 'Conta da academia inativa']);
+                                return;
+                            }
+                            
                             $userData = [
                                 'id' => $usuario['idAcademia'],
                                 'tipo' => $tipo,

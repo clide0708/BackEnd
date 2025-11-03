@@ -50,6 +50,40 @@
             'controller' => 'CadastroController',
             'method' => 'verificarCnpj'
         ],
+        'cadastro/completar-aluno' => [
+            'controller' => 'CadastroController',
+            'method' => 'completarCadastroAluno'
+        ],
+        'cadastro/completar-personal' => [
+            'controller' => 'CadastroController',
+            'method' => 'completarCadastroPersonal'
+        ],
+        'cadastro/completar-academia' => [
+            'controller' => 'CadastroController',
+            'method' => 'completarCadastroAcademia'
+        ],
+        'cadastro/modalidades' => [
+            'controller' => 'CadastroController',
+            'method' => 'listarModalidades'
+        ],
+
+        // Rota para upload de foto de perfil
+        'upload/foto-perfil' => [
+            'controller' => 'UploadController',
+            'method' => 'uploadFotoPerfil'
+        ],
+        'upload/salvar-foto-usuario' => [
+            'controller' => 'UploadController',
+            'method' => 'salvarFotoUsuario'
+        ],
+        'upload/obter-foto-usuario' => [
+            'controller' => 'UploadController',
+            'method' => 'obterFotoUsuario'
+        ],
+        'upload/deletar-foto' => [
+            'controller' => 'UploadController',
+            'method' => 'deletarFotoPerfil'
+        ],
 
         // Rotas para Autenticação
         'auth/login' => [
@@ -427,6 +461,10 @@
             'controller' => 'ConvitesController',
             'method' => 'criarConvite'
         ],
+        'convites/email/([^/]+)' => [
+            'controller' => 'ConvitesController', 
+            'method' => 'getConvitesByEmail'
+        ],
         'convites/([^/]+)' => [
             'controller' => 'ConvitesController',
             'method' => 'getConvites'
@@ -575,12 +613,8 @@
             'method' => 'getHistoricoPagamentos'
         ],
 
-        // Rotas Conectar
+        // Rotas Conectar Aluno/Personal
 
-        'personais' => [
-            'controller' => 'ConnectPersonalController',
-        'method' => 'listarPersonais'
-        ],
         'academias' => [
             'controller' => 'ConnectPersonalController', 
             'method' => 'listarAcademias'
@@ -589,13 +623,47 @@
             'controller' => 'CadastroController',
             'method' => 'listarAcademiasAtivas'
         ],
+        'personais' => [
+            'controller' => 'ConectarPersonalController',
+            'method' => 'listarPersonais'
+        ],
+        'alunos' => [
+            'controller' => 'ConectarPersonalController', 
+            'method' => 'listarAlunos'
+        ],
         'convite' => [
-            'controller' => 'ConnectPersonalController',
+            'controller' => 'ConectarPersonalController',
             'method' => 'enviarConvite'
         ],
+        'modalidades' => [
+            'controller' => 'ConectarPersonalController',
+            'method' => 'listarModalidades'
+        ],
         'meus-convites' => [
-            'controller' => 'ConnectPersonalController',
+            'controller' => 'ConectarPersonalController',
             'method' => 'meusConvites'
+        ],
+
+        // Rotas para AcademiaController
+        'academia/painel' => [
+            'controller' => 'AcademiaController',
+            'method' => 'getPainelControle'
+        ],
+        'academia/solicitacao/enviar' => [
+            'controller' => 'AcademiaController',
+            'method' => 'enviarSolicitacaoVinculacao'
+        ],
+        'academia/solicitacao/(\d+)/aceitar' => [
+            'controller' => 'AcademiaController',
+            'method' => 'aceitarSolicitacao'
+        ],
+        'academia/solicitacao/(\d+)/recusar' => [
+            'controller' => 'AcademiaController',
+            'method' => 'recusarSolicitacao'
+        ],
+        'academia/desvincular' => [
+            'controller' => 'AcademiaController',
+            'method' => 'desvincularUsuario'
         ],
     ];
 
@@ -614,6 +682,8 @@
         'PagamentosController' => __DIR__ . '/../Controllers/PagamentosController.php',
         'VideosController' => __DIR__ . '/../Controllers/VideosController.php',
         'ConectarPersonalController' => __DIR__ . '/../Controllers/ConectarPersonalController.php',
+        'UploadController' => __DIR__ . '/../Controllers/UploadController.php',
+        'AcademiasController' => __DIR__ . '/../Controllers/AcademiasController.php',
     ];
 
     // ATUALIZAR Rotas Públicas - Adicionar novas rotas públicas
@@ -653,6 +723,25 @@
         'exercicios/buscarTodos',
         'exercicios/globais',
         'academias-ativas',
+        'modalidades',
+        'personais',
+        'alunos',
+        'academias',
+        'meus-convites',
+        'convite',
+        'upload/foto-perfil',
+        'upload/salvar-foto-usuario',
+        'upload/obter-foto-usuario',
+        'upload/deletar-foto',
+        'cadastro/modalidades',
+        'cadastro/completar-aluno',
+        'cadastro/completar-personal', 
+        'cadastro/completar-academia',
+        'academia/painel',
+        'academia/solicitacao/enviar',
+        'academia/solicitacao/(\d+)/aceitar', 
+        'academia/solicitacao/(\d+)/recusar',
+        'academia/desvincular',
     ];
 
     // Função para despachar a requisição
@@ -708,6 +797,26 @@
             'perfil/academia',
             'planos',
             'planos/(\d+)',
+            'academias-ativas',
+            'modalidades',
+            'personais',
+            'alunos',
+            'academias',
+            'meus-convites',
+            'convite',
+            'upload/foto-perfil',
+            'upload/salvar-foto-usuario',
+            'upload/obter-foto-usuario',
+            'upload/deletar-foto',
+            'cadastro/modalidades',
+            'cadastro/completar-aluno',
+            'cadastro/completar-personal', 
+            'cadastro/completar-academia',
+            'academia/painel',
+            'academia/solicitacao/enviar',
+            'academia/solicitacao/(\d+)/aceitar', 
+            'academia/solicitacao/(\d+)/recusar',
+            'academia/desvincular',
         ];
 
         // Se a rota não for pública, exige autenticação

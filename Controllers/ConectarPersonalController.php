@@ -21,29 +21,20 @@
             try {
                 // Obter usuário autenticado
                 $usuario = $this->getUsuarioFromToken();
-                if (!$usuario || $usuario['tipo'] !== 'aluno') {
+                
+                // ⭐⭐ CORREÇÃO: Verificação mais robusta
+                if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
                     http_response_code(403);
                     echo json_encode([
                         'success' => false,
-                        'error' => 'Apenas alunos podem buscar personais'
+                        'error' => 'Apenas alunos e personais podem acessar esta funcionalidade'
                     ]);
                     return;
                 }
 
-                // Obter filtros da query string
-                $filtros = [
-                    'academia_id' => $_GET['academia_id'] ?? null,
-                    'cref_tipo' => $_GET['cref_tipo'] ?? null,
-                    'genero' => $_GET['genero'] ?? null,
-                    'latitude' => $_GET['latitude'] ?? null,
-                    'longitude' => $_GET['longitude'] ?? null,
-                    'localizacao' => $_GET['localizacao'] ?? null,
-                    'modalidades' => $_GET['modalidades'] ?? [],
-                    'treinosAdaptados' => $_GET['treinosAdaptados'] ?? null,
-                    'raio_km' => $_GET['raio_km'] ?? 50
-                ];
+                error_log("🎯 listarPersonais chamado por: " . $usuario['tipo'] . " ID: " . $usuario['id']);
 
-                // Query base com JOINs para modalidades e endereço
+                // Query SIMPLIFICADA para testar
                 $sql = "
                     SELECT 
                         p.idPersonal,
@@ -55,98 +46,43 @@
                         p.cref_categoria as cref_tipo,
                         p.treinos_adaptados,
                         p.sobre,
-                        a.nome as nomeAcademia,
-                        a.idAcademia,
                         e.cidade,
-                        e.estado,
-                        e.latitude,
-                        e.longitude,
-                        GROUP_CONCAT(DISTINCT m.nome) as modalidades,
-                        COUNT(DISTINCT t.idTreino) as treinos_count,
-                        COUNT(DISTINCT c.idConvite) as convites_count
+                        e.estado
                     FROM personal p
-                    LEFT JOIN academias a ON p.idAcademia = a.idAcademia
                     LEFT JOIN enderecos_usuarios e ON p.idPersonal = e.idUsuario AND e.tipoUsuario = 'personal'
-                    LEFT JOIN modalidades_personal mp ON p.idPersonal = mp.idPersonal
-                    LEFT JOIN modalidades m ON mp.idModalidade = m.idModalidade
-                    LEFT JOIN treinos t ON p.idPersonal = t.idPersonal AND t.idAluno IS NULL
-                    LEFT JOIN convites c ON p.idPersonal = c.idPersonal AND c.status = 'pendente' AND c.tipo_destinatario = 'personal'
                     WHERE p.status_conta = 'Ativa'
+                    ORDER BY p.nome ASC
                 ";
 
-                $params = [];
-                $conditions = [];
-
-                // Aplicar filtros
-                if ($filtros['academia_id']) {
-                    $conditions[] = "p.idAcademia = ?";
-                    $params[] = $filtros['academia_id'];
-                }
-
-                if ($filtros['cref_tipo']) {
-                    $conditions[] = "p.cref_categoria = ?";
-                    $params[] = $filtros['cref_tipo'];
-                }
-
-                if ($filtros['genero']) {
-                    $conditions[] = "p.genero = ?";
-                    $params[] = $filtros['genero'];
-                }
-
-                if ($filtros['treinosAdaptados'] !== null) {
-                    $conditions[] = "p.treinos_adaptados = ?";
-                    $params[] = $filtros['treinosAdaptados'] === 'true' ? 1 : 0;
-                }
-
-                // Filtro por localização
-                if ($filtros['localizacao']) {
-                    $conditions[] = "(e.cidade LIKE ? OR e.estado LIKE ? OR a.endereco LIKE ?)";
-                    $localizacaoLike = "%{$filtros['localizacao']}%";
-                    $params[] = $localizacaoLike;
-                    $params[] = $localizacaoLike;
-                    $params[] = $localizacaoLike;
-                }
-
-                // Adicionar condições à query
-                if (!empty($conditions)) {
-                    $sql .= " AND " . implode(" AND ", $conditions);
-                }
-
-                // Agrupar e ordenar
-                $sql .= " GROUP BY p.idPersonal, a.idAcademia, e.idEndereco";
-                $sql .= " ORDER BY p.treinos_adaptados DESC, treinos_count DESC, p.nome ASC";
+                error_log("🔍 SQL Personais Simplificado: " . $sql);
 
                 $stmt = $this->db->prepare($sql);
-                $stmt->execute($params);
+                $stmt->execute();
                 $personais = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                // Processar resultados e calcular distâncias
+                error_log("✅ Personais encontrados no BD: " . count($personais));
+                
+                if (count($personais) > 0) {
+                    error_log("📝 Primeiro personal: " . json_encode($personais[0]));
+                } else {
+                    error_log("📝 Nenhum personal encontrado");
+                }
+
+                // Processar resultados
                 $resultados = [];
                 foreach ($personais as $personal) {
-                    // Processar modalidades
-                    $modalidadesList = [];
-                    if ($personal['modalidades']) {
-                        $modalidadesList = explode(',', $personal['modalidades']);
-                    }
-
-                    // Calcular distância se tiver coordenadas
-                    $distancia = null;
-                    if ($filtros['latitude'] && $filtros['longitude'] && $personal['latitude'] && $personal['longitude']) {
-                        $distancia = $this->calcularDistancia(
-                            $filtros['latitude'],
-                            $filtros['longitude'],
-                            $personal['latitude'],
-                            $personal['longitude']
+                    // Verificar convite pendente de forma segura
+                    $convitePendente = false;
+                    try {
+                        $convitePendente = $this->verificarConvitePendente(
+                            $usuario['id'], 
+                            'aluno', 
+                            $personal['idPersonal'], 
+                            'personal'
                         );
-                        
-                        // Filtrar por raio se especificado
-                        if ($distancia > $filtros['raio_km']) {
-                            continue;
-                        }
+                    } catch (Exception $e) {
+                        error_log("⚠️ Erro ao verificar convite: " . $e->getMessage());
                     }
-
-                    // Verificar se já existe convite pendente do usuário atual
-                    $convitePendente = $this->verificarConvitePendente($usuario['id'], 'aluno', $personal['idPersonal'], 'personal');
 
                     $resultados[] = [
                         'idPersonal' => $personal['idPersonal'],
@@ -158,61 +94,41 @@
                         'cref_tipo' => $personal['cref_tipo'],
                         'treinosAdaptados' => (bool)$personal['treinos_adaptados'],
                         'sobre' => $personal['sobre'],
-                        'nomeAcademia' => $personal['nomeAcademia'],
-                        'idAcademia' => $personal['idAcademia'],
                         'cidade' => $personal['cidade'],
                         'estado' => $personal['estado'],
-                        'treinos_count' => (int)$personal['treinos_count'],
-                        'modalidades' => $modalidadesList,
-                        'distancia_km' => $distancia,
+                        'modalidades' => [], // Simplificado por enquanto
+                        'distancia_km' => null, // Simplificado por enquanto
                         'convitePendente' => $convitePendente
                     ];
                 }
 
-                // Aplicar filtro de modalidades
-                if (!empty($filtros['modalidades'])) {
-                    $modalidadesFiltro = is_array($filtros['modalidades']) ? 
-                        $filtros['modalidades'] : [$filtros['modalidades']];
-                    
-                    $resultados = array_filter($resultados, function($personal) use ($modalidadesFiltro) {
-                        if (empty($personal['modalidades'])) return false;
-                        
-                        foreach ($modalidadesFiltro as $modalidade) {
-                            if (in_array($modalidade, $personal['modalidades'])) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-                }
-
-                // Ordenar por distância se disponível
-                if ($filtros['latitude'] && $filtros['longitude']) {
-                    usort($resultados, function($a, $b) {
-                        if ($a['distancia_km'] === null) return 1;
-                        if ($b['distancia_km'] === null) return -1;
-                        return $a['distancia_km'] <=> $b['distancia_km'];
-                    });
-                }
+                error_log("🎯 Personais resultados finais: " . count($resultados));
 
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
-                    'data' => array_values($resultados),
-                    'total' => count($resultados)
+                    'data' => $resultados,
+                    'total' => count($resultados),
+                    'debug' => [
+                        'query_simplificada' => true,
+                        'personais_encontrados' => count($personais),
+                        'resultados_processados' => count($resultados)
+                    ]
                 ]);
 
             } catch (PDOException $e) {
+                error_log("❌ Erro listarPersonais: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode([
                     'success' => false,
                     'error' => 'Erro no banco: ' . $e->getMessage()
                 ]);
             } catch (Exception $e) {
+                error_log("❌ Erro geral listarPersonais: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode([
                     'success' => false,
-                    'error' => $e->getMessage()
+                    'error' => 'Erro interno: ' . $e->getMessage()
                 ]);
             }
         }
@@ -227,33 +143,22 @@
             try {
                 // Obter usuário autenticado
                 $usuario = $this->getUsuarioFromToken();
-                if (!$usuario || $usuario['tipo'] !== 'personal') {
+                
+                // ⭐⭐ CORREÇÃO: Verificação mais robusta
+                if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
                     http_response_code(403);
                     echo json_encode([
                         'success' => false,
-                        'error' => 'Apenas personais podem buscar alunos'
+                        'error' => 'Apenas alunos e personais podem acessar esta funcionalidade'
                     ]);
                     return;
                 }
 
-                // Obter filtros da query string
-                $filtros = [
-                    'academia_id' => $_GET['academia_id'] ?? null,
-                    'genero' => $_GET['genero'] ?? null,
-                    'idade_min' => $_GET['idade_min'] ?? null,
-                    'idade_max' => $_GET['idade_max'] ?? null,
-                    'meta' => $_GET['meta'] ?? null,
-                    'latitude' => $_GET['latitude'] ?? null,
-                    'longitude' => $_GET['longitude'] ?? null,
-                    'localizacao' => $_GET['localizacao'] ?? null,
-                    'modalidades' => $_GET['modalidades'] ?? [],
-                    'treinosAdaptados' => $_GET['treinosAdaptados'] ?? null,
-                    'raio_km' => $_GET['raio_km'] ?? 50
-                ];
+                error_log("🎯 listarAlunos chamado por: " . $usuario['tipo'] . " ID: " . $usuario['id']);
 
-                // Query base
+                // Query SIMPLIFICADA para testar
                 $sql = "
-                    SELECT 
+                    SELECT DISTINCT
                         a.idAluno,
                         a.nome,
                         a.foto_perfil,
@@ -264,107 +169,47 @@
                         a.meta,
                         a.treinos_adaptados,
                         a.treinoTipo,
+                        a.idPersonal,
+                        a.status_conta,
                         e.cidade,
-                        e.estado,
-                        e.latitude,
-                        e.longitude,
-                        GROUP_CONCAT(DISTINCT m.nome) as modalidades,
-                        COUNT(DISTINCT c.idConvite) as convites_count
+                        e.estado
                     FROM alunos a
                     LEFT JOIN enderecos_usuarios e ON a.idAluno = e.idUsuario AND e.tipoUsuario = 'aluno'
-                    LEFT JOIN modalidades_aluno ma ON a.idAluno = ma.idAluno
-                    LEFT JOIN modalidades m ON ma.idModalidade = m.idModalidade
-                    LEFT JOIN convites c ON a.idAluno = c.idAluno AND c.status = 'pendente' AND c.tipo_destinatario = 'aluno'
                     WHERE a.status_conta = 'Ativa' 
                     AND a.idPersonal IS NULL
+                    ORDER BY a.data_cadastro DESC
                 ";
 
-                $params = [];
-                $conditions = [];
-
-                // Aplicar filtros
-                if ($filtros['academia_id']) {
-                    // Buscar alunos por academia através do endereço
-                    $conditions[] = "EXISTS (
-                        SELECT 1 FROM academias ac 
-                        WHERE ac.idAcademia = ? 
-                        AND (ac.endereco LIKE CONCAT('%', e.cidade, '%') OR ac.endereco LIKE CONCAT('%', e.estado, '%'))
-                    )";
-                    $params[] = $filtros['academia_id'];
-                }
-
-                if ($filtros['genero']) {
-                    $conditions[] = "a.genero = ?";
-                    $params[] = $filtros['genero'];
-                }
-
-                if ($filtros['idade_min']) {
-                    $conditions[] = "a.idade >= ?";
-                    $params[] = $filtros['idade_min'];
-                }
-
-                if ($filtros['idade_max']) {
-                    $conditions[] = "a.idade <= ?";
-                    $params[] = $filtros['idade_max'];
-                }
-
-                if ($filtros['meta']) {
-                    $conditions[] = "a.meta LIKE ?";
-                    $params[] = "%{$filtros['meta']}%";
-                }
-
-                if ($filtros['treinosAdaptados'] !== null) {
-                    $conditions[] = "a.treinos_adaptados = ?";
-                    $params[] = $filtros['treinosAdaptados'] === 'true' ? 1 : 0;
-                }
-
-                // Filtro por localização
-                if ($filtros['localizacao']) {
-                    $conditions[] = "(e.cidade LIKE ? OR e.estado LIKE ?)";
-                    $localizacaoLike = "%{$filtros['localizacao']}%";
-                    $params[] = $localizacaoLike;
-                    $params[] = $localizacaoLike;
-                }
-
-                // Adicionar condições
-                if (!empty($conditions)) {
-                    $sql .= " AND " . implode(" AND ", $conditions);
-                }
-
-                // Agrupar e ordenar
-                $sql .= " GROUP BY a.idAluno, e.idEndereco";
-                $sql .= " ORDER BY a.data_cadastro DESC";
+                error_log("🔍 SQL Alunos Simplificado: " . $sql);
 
                 $stmt = $this->db->prepare($sql);
-                $stmt->execute($params);
+                $stmt->execute();
                 $alunos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                error_log("✅ Alunos encontrados no BD: " . count($alunos));
+                
+                // Log dos primeiros alunos para debug
+                if (count($alunos) > 0) {
+                    error_log("📝 Primeiro aluno: " . json_encode($alunos[0]));
+                } else {
+                    error_log("📝 Nenhum aluno encontrado com os critérios");
+                }
 
                 // Processar resultados
                 $resultados = [];
                 foreach ($alunos as $aluno) {
-                    // Processar modalidades
-                    $modalidadesList = [];
-                    if ($aluno['modalidades']) {
-                        $modalidadesList = explode(',', $aluno['modalidades']);
-                    }
-
-                    // Calcular distância
-                    $distancia = null;
-                    if ($filtros['latitude'] && $filtros['longitude'] && $aluno['latitude'] && $aluno['longitude']) {
-                        $distancia = $this->calcularDistancia(
-                            $filtros['latitude'],
-                            $filtros['longitude'],
-                            $aluno['latitude'],
-                            $aluno['longitude']
+                    // Verificar convite pendente de forma segura
+                    $convitePendente = false;
+                    try {
+                        $convitePendente = $this->verificarConvitePendente(
+                            $usuario['id'], 
+                            'personal', 
+                            $aluno['idAluno'], 
+                            'aluno'
                         );
-                        
-                        if ($distancia > $filtros['raio_km']) {
-                            continue;
-                        }
+                    } catch (Exception $e) {
+                        error_log("⚠️ Erro ao verificar convite: " . $e->getMessage());
                     }
-
-                    // Verificar convite pendente
-                    $convitePendente = $this->verificarConvitePendente($usuario['id'], 'personal', $aluno['idAluno'], 'aluno');
 
                     $resultados[] = [
                         'idAluno' => $aluno['idAluno'],
@@ -379,49 +224,43 @@
                         'treinoTipo' => $aluno['treinoTipo'],
                         'cidade' => $aluno['cidade'],
                         'estado' => $aluno['estado'],
-                        'modalidades' => $modalidadesList,
-                        'distancia_km' => $distancia,
+                        'modalidades' => [], // Simplificado por enquanto
+                        'distancia_km' => null, // Simplificado por enquanto
                         'convitePendente' => $convitePendente
                     ];
                 }
 
-                // Aplicar filtro de modalidades
-                if (!empty($filtros['modalidades'])) {
-                    $modalidadesFiltro = is_array($filtros['modalidades']) ? 
-                        $filtros['modalidades'] : [$filtros['modalidades']];
-                    
-                    $resultados = array_filter($resultados, function($aluno) use ($modalidadesFiltro) {
-                        if (empty($aluno['modalidades'])) return false;
-                        foreach ($modalidadesFiltro as $modalidade) {
-                            if (in_array($modalidade, $aluno['modalidades'])) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-                }
-
-                // Ordenar por distância
-                if ($filtros['latitude'] && $filtros['longitude']) {
-                    usort($resultados, function($a, $b) {
-                        if ($a['distancia_km'] === null) return 1;
-                        if ($b['distancia_km'] === null) return -1;
-                        return $a['distancia_km'] <=> $b['distancia_km'];
-                    });
-                }
+                error_log("🎯 Resultados finais para retorno: " . count($resultados));
 
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
-                    'data' => array_values($resultados),
-                    'total' => count($resultados)
+                    'data' => $resultados,
+                    'total' => count($resultados),
+                    'debug' => [
+                        'query_simplificada' => true,
+                        'alunos_encontrados' => count($alunos),
+                        'resultados_processados' => count($resultados),
+                        'usuario_requisitante' => [
+                            'id' => $usuario['id'],
+                            'tipo' => $usuario['tipo']
+                        ]
+                    ]
                 ]);
 
             } catch (PDOException $e) {
+                error_log("❌ Erro listarAlunos: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode([
                     'success' => false,
                     'error' => 'Erro no banco: ' . $e->getMessage()
+                ]);
+            } catch (Exception $e) {
+                error_log("❌ Erro geral listarAlunos: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Erro interno: ' . $e->getMessage()
                 ]);
             }
         }
@@ -685,13 +524,19 @@
                 try {
                     $decoded = decodificarToken($token);
                     if ($decoded) {
+                        // ⭐⭐ CORREÇÃO: Converter objeto para array se necessário
+                        if (is_object($decoded)) {
+                            $decoded = (array)$decoded;
+                        }
+                        
                         return [
-                            'id' => $decoded['sub'],
-                            'tipo' => $decoded['tipo'],
-                            'email' => $decoded['email']
+                            'id' => $decoded['sub'] ?? $decoded->sub ?? null,
+                            'tipo' => $decoded['tipo'] ?? $decoded->tipo ?? null,
+                            'email' => $decoded['email'] ?? $decoded->email ?? null
                         ];
                     }
                 } catch (Exception $e) {
+                    error_log("❌ Erro ao decodificar token: " . $e->getMessage());
                     return null;
                 }
             }

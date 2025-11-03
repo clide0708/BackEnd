@@ -163,6 +163,43 @@
             }
         }
 
+        public function getConvitesByEmail($email) {
+            header('Content-Type: application/json');
+            
+            try {
+                $email = urldecode($email);
+                
+                $stmt = $this->db->prepare("
+                    SELECT c.*, 
+                        p.nome as nomePersonal,
+                        a.nome as nomeAluno,
+                        p.foto_perfil as fotoPersonal,
+                        a.foto_perfil as fotoAluno
+                    FROM convites c
+                    LEFT JOIN personal p ON c.idPersonal = p.idPersonal
+                    LEFT JOIN alunos a ON c.idAluno = a.idAluno
+                    WHERE (a.email = ? OR p.email = ?) 
+                    AND c.status = 'pendente'
+                    ORDER BY c.data_criacao DESC
+                ");
+                
+                $stmt->execute([$email, $email]);
+                $convites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'data' => $convites
+                ]);
+                
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Erro ao buscar convites: ' . $e->getMessage()
+                ]);
+            }
+        }
 
         /**
          * Aceita o convite (Aluno aceita).

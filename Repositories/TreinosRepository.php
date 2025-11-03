@@ -495,63 +495,6 @@
             }
         }
 
-        // public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
-        //     $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
-            
-        //     $sql = "
-        //         SELECT 
-        //             ts.idSessao, 
-        //             ts.idTreino, 
-        //             ts.data_inicio, 
-        //             ts.data_fim, 
-        //             ts.status, 
-        //             ts.progresso_json, 
-        //             ts.duracao_total, 
-        //             ts.notas,
-        //             ts.porcentagem_concluida,
-        //             t.nome AS nome_treino, 
-        //             t.descricao, 
-        //             t.tipo_treino,
-        //             -- Nome do criador
-        //             CASE 
-        //                 WHEN t.idPersonal IS NOT NULL THEN p.nome
-        //                 WHEN t.idAluno IS NOT NULL THEN a.nome
-        //                 ELSE 'Usuário'
-        //             END AS nome_criador,
-        //             -- Primeiro exercício para thumbnail
-        //             (SELECT v.url FROM treino_exercicio te 
-        //             LEFT JOIN exercicios e ON te.idExercicio = e.idExercicio 
-        //             LEFT JOIN videos v ON e.idExercicio = v.idExercicio 
-        //             WHERE te.idTreino = t.idTreino 
-        //             ORDER BY te.ordem LIMIT 1) AS primeiro_video_url
-        //         FROM treino_sessao ts
-        //         INNER JOIN treinos t ON ts.idTreino = t.idTreino
-        //         LEFT JOIN personal p ON t.idPersonal = p.idPersonal
-        //         LEFT JOIN alunos a ON t.idAluno = a.idAluno
-        //         WHERE ts.idUsuario = ? AND ts.tipo_usuario = ? AND ts.data_inicio >= ?
-        //         ORDER BY ts.data_inicio DESC
-        //     ";
-            
-        //     $stmt = $this->db->prepare($sql);
-        //     $stmt->execute([$idUsuario, $tipoUsuario, $dataLimite]);
-        //     $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        //     // Processar resultados
-        //     foreach ($resultados as &$resultado) {
-        //         $porcentagem = $resultado['porcentagem_concluida'] ?? 0;
-        //         $resultado['porcentagem_concluida'] = round($porcentagem);
-        //         $resultado['data_formatada'] = date('d/m', strtotime($resultado['data_inicio']));
-        //         $resultado['tipo_display'] = ($resultado['tipo_treino'] === 'adaptado') ? 'Adaptado' : 'Normal';
-                
-        //         // Garantir que o status esteja correto baseado na porcentagem
-        //         if ($resultado['status'] === 'concluido' && $porcentagem < 100) {
-        //             $resultado['status'] = 'em_progresso';
-        //         }
-        //     }
-
-        //     return $resultados;
-        // }
-
         public function buscarHistoricoTreinos($idUsuario, $tipoUsuario, $dias = 30) {
             $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
             
