@@ -386,12 +386,13 @@
                     $academiaId = $this->db->lastInsertId();
                     error_log("✅ Academia cadastrada com ID: " . $academiaId);
                     
-                    // 🔥 CORREÇÃO: Salvar endereço se existir
+                    // 🔥 CORREÇÃO CRÍTICA: Salvar endereço para academia
                     if (isset($data['cep']) && !empty(trim($data['cep']))) {
                         error_log("💾 Salvando endereço para academia ID: " . $academiaId);
                         $errosEndereco = $this->validarDadosEndereco($data);
                         if (empty($errosEndereco)) {
-                            $this->cadastrarEnderecoUsuario($academiaId, 'academia', $data);
+                            // 🔥 CORREÇÃO: Usar a função correta para salvar endereço de academia
+                            $this->cadastrarEnderecoAcademia($academiaId, $data);
                             error_log("✅ Endereço salvo com sucesso");
                         } else {
                             error_log("⚠️ Endereço inválido: " . implode(', ', $errosEndereco));
@@ -435,6 +436,34 @@
                     http_response_code(500);
                     echo json_encode(['success' => false, 'error' => 'Erro ao cadastrar academia: ' . $e->getMessage()]);
                 }
+            }
+        }
+
+        private function cadastrarEnderecoAcademia($idAcademia, $data) {
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO enderecos_usuarios (
+                        idUsuario, tipoUsuario, cep, logradouro, numero, complemento,
+                        bairro, cidade, estado, pais, data_criacao
+                    ) VALUES (?, 'academia', ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ");
+
+                $success = $stmt->execute([
+                    $idAcademia,
+                    $data['cep'] ?? null,
+                    $data['logradouro'] ?? null,
+                    $data['numero'] ?? null,
+                    $data['complemento'] ?? null,
+                    $data['bairro'] ?? null,
+                    $data['cidade'] ?? null,
+                    $data['estado'] ?? null,
+                    $data['pais'] ?? 'Brasil'
+                ]);
+
+                return $success;
+            } catch (PDOException $e) {
+                error_log("Erro ao cadastrar endereço da academia: " . $e->getMessage());
+                return false;
             }
         }
 
@@ -789,17 +818,38 @@
             try {
                 // 🔥 CORREÇÃO: Verificar se é FormData ou JSON
                 $dados = $data;
+        
+                // Se veio como FormData, processar corretamente
                 if (empty($data) && isset($_POST) && !empty($_POST)) {
-                    // Se veio como FormData, usar $_POST
                     $dados = $_POST;
                     
-                    // Processar arrays do FormData
+                    // Processar modalidades do FormData (que vem como array)
                     if (isset($_POST['modalidades']) && is_array($_POST['modalidades'])) {
                         $dados['modalidades'] = $_POST['modalidades'];
+                    } else if (isset($_POST['modalidades[]'])) {
+                        // Alternativa: modalidades podem vir como modalidades[]
+                        $dados['modalidades'] = is_array($_POST['modalidades[]']) ? $_POST['modalidades[]'] : [$_POST['modalidades[]']];
                     }
                 }
 
                 error_log("📥 Dados recebidos para cadastro completo: " . json_encode($dados));
+                
+                // Debug específico para modalidades
+                if (isset($dados['modalidades'])) {
+                    error_log("🎯 Modalidades recebidas: " . json_encode($dados['modalidades']));
+                } else {
+                    error_log("⚠️ Nenhuma modalidade recebida");
+                    // Tentar buscar modalidades de outras formas
+                    if (isset($dados['modalidades[]'])) {
+                        $dados['modalidades'] = is_array($dados['modalidades[]']) ? $dados['modalidades[]'] : [$dados['modalidades[]']];
+                        error_log("🎯 Modalidades encontradas em modalidades[]: " . json_encode($dados['modalidades']));
+                    }
+                }
+                
+                // Debug específico para endereço
+                if (isset($data['cep'])) {
+                error_log("📍 Dados de endereço recebidos - CEP: " . $data['cep']);
+                }
 
                 // Determinar tipo de usuário e ID
                 $tipoUsuario = null;
@@ -944,7 +994,7 @@
                 }
 
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
-                $fotoUrl = $dados['foto_url'] ?? null;
+                $fotoUrl = $data['foto_url'] ?? null;
 
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
@@ -961,7 +1011,7 @@
                     $dados['meta'] ?? null,
                     $dados['treinoTipo'] ?? null,
                     $dados['treinos_adaptados'] ?? 0,
-                    $fotoUrl, // URL da foto (pode ser null)
+                    $fotoUrl, // 🔥 CORREÇÃO: Usar a foto_url
                     $idAluno
                 ]);
 

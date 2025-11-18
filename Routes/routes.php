@@ -495,17 +495,22 @@
 
         // Rotas para Perfil
 
+        'perfil/completo/([^/]+)/(\d+)' => [
+            'controller' => 'PerfilController', 
+            'method' => 'getPerfilCompleto'
+        ],
+        'perfil/(.+)' => [
+            'controller' => 'PerfilController',
+            'method' => 'getPerfilPorEmail'
+        ],
         'perfil/usuario/([A-Za-z0-9@._-]+)' => [
             'controller' => 'PerfilController',
             'method' => 'getUsuarioPorEmail'
         ],
-
         'perfil/atualizar' => [
             'controller' => 'PerfilController',
-            'method' => 'atualizarPerfil',
-            'http_method' => 'PUT'
+            'method' => 'atualizarPerfil'
         ],
-
         'perfil/aluno/(\d+)' => [
             'controller' => 'PerfilController',
             'method' => 'getPerfilAluno'
@@ -671,7 +676,7 @@
         ],
 
         // Rotas para Endereço
-        'endereco/([^/]+)' => [
+        'endereco/(.+)' => [
             'controller' => 'EnderecoController',
             'method' => 'getEnderecoPorEmail'
         ],
@@ -679,6 +684,12 @@
             'controller' => 'EnderecoController',
             'method' => 'atualizarEndereco'
         ],
+
+        // Rota para verificar arquivo enviado
+        'upload/verificar-arquivo' => [
+            'controller' => 'UploadController',
+            'method' => 'verificarArquivo'
+],
     ];
 
     // Mapeamento de controladores - ADICIONAR VideosController
@@ -760,6 +771,7 @@
         'academia/desvincular',
         'endereco/([^/]+)',
         'endereco/atualizar',
+        'upload/verificar-arquivo',
     ];
 
     // Função para despachar a requisição

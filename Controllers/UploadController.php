@@ -249,6 +249,36 @@
                 echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
         }
+
+        public function verificarArquivo($data) {
+            try {
+                $nomeArquivo = $data['nome_arquivo'] ?? '';
+                
+                if (!$nomeArquivo) {
+                    echo json_encode(['success' => false, 'error' => 'Nome do arquivo não fornecido']);
+                    return;
+                }
+                
+                $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
+                $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+                
+                $existe = file_exists($caminhoCompleto);
+                $tamanho = $existe ? filesize($caminhoCompleto) : 0;
+                $acessivel = $existe ? is_readable($caminhoCompleto) : false;
+                
+                echo json_encode([
+                    'success' => true,
+                    'existe' => $existe,
+                    'tamanho' => $tamanho,
+                    'acessivel' => $acessivel,
+                    'caminho' => $caminhoCompleto,
+                    'url_relativa' => '/assets/images/uploads/' . $nomeArquivo
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
     }
 
 ?>
