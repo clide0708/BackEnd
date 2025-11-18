@@ -112,16 +112,6 @@
                         return;
                 }
 
-                // Primeiro, buscar foto antiga para deletar
-                $stmt = $this->db->prepare("SELECT {$colunaFoto} FROM {$tabela} WHERE {$colunaId} = ?");
-                $stmt->execute([$idUsuario]);
-                $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                // Deletar foto antiga se existir
-                if ($usuario && $usuario[$colunaFoto]) {
-                    $this->deletarFotoArquivo($usuario[$colunaFoto]);
-                }
-
                 // Atualizar com nova foto
                 $stmt = $this->db->prepare("UPDATE {$tabela} SET {$colunaFoto} = ? WHERE {$colunaId} = ?");
                 $success = $stmt->execute([$fotoUrl, $idUsuario]);

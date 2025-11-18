@@ -296,16 +296,18 @@
 
         public function cadastrarAcademia($data){
             try {
-                // ⭐⭐ CORREÇÃO: Campos obrigatórios para academia
+                error_log("📥 Dados recebidos no cadastro academia: " . json_encode($data));
+
                 $camposObrigatorios = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'senha'];
                 foreach ($camposObrigatorios as $campo) {
                     if (!isset($data[$campo]) || empty(trim($data[$campo]))) {
+                        error_log("❌ Campo obrigatório faltando ou vazio: " . $campo);
+                        error_log("❌ Valor recebido: " . ($data[$campo] ?? 'NULL'));
                         http_response_code(400);
                         echo json_encode(['success' => false, 'error' => "Campo {$campo} é obrigatório"]);
                         return;
                     }
                 }
-
                 if (!$this->validarEmail($data['email'])) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Email inválido']);
@@ -346,14 +348,20 @@
                     echo json_encode(['success' => false, 'error' => 'Plano padrão para academia não encontrado.']);
                     return;
                 }
-
-                // ⭐⭐ CORREÇÃO: Inserir apenas campos relevantes para academia
+                
+                error_log("🎯 Inserindo academia no banco...");
+                
                 $stmt = $this->db->prepare("
-                    INSERT INTO academias (nome, nome_fantasia, razao_social, cnpj, email, senha, telefone, data_cadastro, idPlano, status_conta) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'Ativa')
+                    INSERT INTO academias (
+                        nome, nome_fantasia, razao_social, cnpj, email, senha, telefone, 
+                        tamanho_estrutura, capacidade_maxima, ano_fundacao, 
+                        estacionamento, vestiario, ar_condicionado, wifi, 
+                        totem_de_carregamento_usb, area_descanso, avaliacao_fisica, 
+                        data_cadastro, idPlano, status_conta
+                    ) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'Ativa')
                 ");
 
-                // ⭐⭐ CORREÇÃO: Usar nome_fantasia como nome principal também
                 $success = $stmt->execute([
                     trim($data['nome_fantasia']), // nome
                     trim($data['nome_fantasia']), // nome_fantasia
@@ -362,12 +370,30 @@
                     trim($data['email']),         // email
                     $senhaHash,                   // senha
                     isset($data['telefone']) ? $this->formatarTelefone($data['telefone']) : null,
+                    $data['tamanho_estrutura'] ?? null,
+                    $data['capacidade_maxima'] ?? null,
+                    $data['ano_fundacao'] ?? null,
+                    $data['estacionamento'] ?? 0,
+                    $data['vestiario'] ?? 0,
+                    $data['ar_condicionado'] ?? 0,
+                    $data['wifi'] ?? 0,
+                    $data['totem_de_carregamento_usb'] ?? 0,
+                    $data['area_descanso'] ?? 0,
+                    $data['avaliacao_fisica'] ?? 0,
                     $idPlanoAcademia
                 ]);
 
                 if ($success) {
                     $academiaId = $this->db->lastInsertId();
-                    // Criar assinatura para o plano da academia
+                    error_log("✅ Academia cadastrada com ID: " . $academiaId);
+                    
+                    // Salvar horários se existirem
+                    if (isset($data['horarios']) && is_array($data['horarios'])) {
+                        error_log("💾 Salvando horários para academia ID: " . $academiaId);
+                        $this->salvarHorariosAcademia($academiaId, $data['horarios']);
+                    }
+                    
+                    // Criar assinatura para o plano
                     $this->criarAssinatura($academiaId, 'academia', $idPlanoAcademia, 'ativa');
 
                     http_response_code(201);
@@ -377,10 +403,12 @@
                         'message' => 'Academia cadastrada com sucesso e plano atribuído.'
                     ]);
                 } else {
+                    error_log("❌ Erro ao executar INSERT na tabela academias");
                     http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'Erro ao cadastrar academia']);
+                    echo json_encode(['success' => false, 'error' => 'Erro ao cadastrar academia no banco de dados']);
                 }
             } catch (PDOException $e) {
+                error_log("❌ PDOException no cadastro academia: " . $e->getMessage());
                 if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Dados já cadastrados no sistema']);
@@ -635,19 +663,41 @@
         public function listarAcademiasAtivas(){
             header('Content-Type: application/json');
             
-            error_log("🎯 listarAcademiasAtivas() chamada"); // ← ADICIONE ESTE LOG
+            error_log("🎯 listarAcademiasAtivas() chamada");
             
             try {
                 $stmt = $this->db->prepare("
-                    SELECT idAcademia, nome, endereco, telefone 
-                    FROM academias 
-                    WHERE status_conta = 'Ativa'
-                    ORDER BY nome
+                    SELECT 
+                        a.idAcademia,
+                        a.nome,
+                        a.sobre,
+                        a.foto_url,
+                        a.telefone,
+                        a.estacionamento,
+                        a.vestiario,
+                        a.ar_condicionado,
+                        a.wifi,
+                        a.avaliacao_fisica,
+                        CONCAT(
+                            COALESCE(eu.logradouro, ''), 
+                            CASE WHEN eu.numero IS NOT NULL THEN CONCAT(', ', eu.numero) ELSE '' END,
+                            CASE WHEN eu.bairro IS NOT NULL THEN CONCAT(' - ', eu.bairro) ELSE '' END,
+                            CASE WHEN eu.cidade IS NOT NULL THEN CONCAT(', ', eu.cidade) ELSE '' END,
+                            CASE WHEN eu.estado IS NOT NULL THEN CONCAT(' - ', eu.estado) ELSE '' END
+                        ) as endereco_completo,
+                        GROUP_CONCAT(DISTINCT m.nome SEPARATOR ', ') as modalidades
+                    FROM academias a
+                    LEFT JOIN enderecos_usuarios eu ON a.idAcademia = eu.idUsuario AND eu.tipoUsuario = 'academia'
+                    LEFT JOIN modalidades_academia ma ON a.idAcademia = ma.idAcademia
+                    LEFT JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                    WHERE a.status_conta = 'Ativa'
+                    GROUP BY a.idAcademia
+                    ORDER BY a.nome
                 ");
                 $stmt->execute();
                 $academias = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                error_log("✅ Academias encontradas: " . count($academias)); // ← LOG
+                error_log("✅ Academias encontradas: " . count($academias));
                 
                 http_response_code(200);
                 echo json_encode([
@@ -656,7 +706,7 @@
                 ]);
 
             } catch (PDOException $e) {
-                error_log("❌ Erro no listarAcademiasAtivas: " . $e->getMessage()); // ← LOG
+                error_log("❌ Erro no listarAcademiasAtivas: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode([
                     'success' => false,
@@ -728,7 +778,11 @@
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
                     UPDATE academias 
-                    SET sobre = ?, foto_url = ?, treinos_adaptados = ?, cadastro_completo = 1
+                    SET sobre = ?, foto_url = ?, treinos_adaptados = ?, 
+                        tamanho_estrutura = ?, capacidade_maxima = ?, ano_fundacao = ?, 
+                        estacionamento = ?, vestiario = ?, ar_condicionado = ?, wifi = ?, 
+                        totem_de_carregamento_usb = ?, area_descanso = ?, avaliacao_fisica = ?,
+                        cadastro_completo = 1
                     WHERE idAcademia = ?
                 ");
 
@@ -744,10 +798,25 @@
                     $data['sobre'] ?? null,
                     $data['foto_url'] ?? null,
                     $data['treinos_adaptados'] ?? 0,
+                    $data['tamanho_estrutura'] ?? null,
+                    $data['capacidade_maxima'] ?? null,
+                    $data['ano_fundacao'] ?? null,
+                    $data['estacionamento'] ?? 0,
+                    $data['vestiario'] ?? 0,
+                    $data['ar_condicionado'] ?? 0,
+                    $data['wifi'] ?? 0,
+                    $data['totem_de_carregamento_usb'] ?? 0,
+                    $data['area_descanso'] ?? 0,
+                    $data['avaliacao_fisica'] ?? 0,
                     $idAcademia
                 ]);
 
                 if ($success) {
+                    // Atualizar horários
+                    if (isset($data['horarios']) && is_array($data['horarios'])) {
+                        $this->atualizarHorariosAcademia($idAcademia, $data['horarios']);
+                    }
+                    
                     // Processar modalidades da academia
                     if (isset($data['modalidades']) && is_array($data['modalidades'])) {
                         $this->vincularModalidadesAcademia($idAcademia, $data['modalidades']);
@@ -786,7 +855,16 @@
                     return;
                 }
 
-                // Atualizar dados principais - foto_url é opcional
+                // PROCESSAR UPLOAD DE FOTO SE EXISTIR
+                $fotoUrl = $data['foto_url'] ?? null;
+                if (!$fotoUrl && isset($_FILES['foto'])) {
+                    $uploadResult = $this->uploadESalvarFotoPerfil($data);
+                    if ($uploadResult['success']) {
+                        $fotoUrl = $uploadResult['url'];
+                    }
+                }
+
+                // Atualizar dados principais
                 $stmt = $this->db->prepare("
                     UPDATE alunos 
                     SET data_nascimento = ?, genero = ?, altura = ?, meta = ?, 
@@ -801,7 +879,7 @@
                     $data['meta'] ?? null,
                     $data['treinoTipo'] ?? null,
                     $data['treinos_adaptados'] ?? 0,
-                    $data['foto_url'] ?? null, // URL da foto (opcional)
+                    $fotoUrl, // URL da foto (pode ser null)
                     $idAluno
                 ]);
 
@@ -814,7 +892,8 @@
                     http_response_code(200);
                     echo json_encode([
                         'success' => true,
-                        'message' => 'Cadastro completado com sucesso'
+                        'message' => 'Cadastro completado com sucesso',
+                        'foto_url' => $fotoUrl
                     ]);
                 } else {
                     http_response_code(400);
@@ -995,6 +1074,97 @@
             }
 
             return $erros;
+        }
+
+        private function salvarHorariosAcademia($academiaId, $horarios) {
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO academia_horarios 
+                    (idAcademia, dia_semana, aberto_24h, horario_abertura, horario_fechamento, fechado) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                
+                foreach ($horarios as $horario) {
+                    $stmt->execute([
+                        $academiaId,
+                        $horario['dia_semana'],
+                        $horario['aberto_24h'] ? 1 : 0,
+                        $horario['horario_abertura'] ?: null,
+                        $horario['horario_fechamento'] ?: null,
+                        $horario['fechado'] ? 1 : 0
+                    ]);
+                }
+                
+                return true;
+            } catch (PDOException $e) {
+                error_log("Erro ao salvar horários da academia: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function atualizarHorariosAcademia($academiaId, $horarios) {
+            try {
+                // Primeiro deleta os horários existentes
+                $deleteStmt = $this->db->prepare("DELETE FROM academia_horarios WHERE idAcademia = ?");
+                $deleteStmt->execute([$academiaId]);
+                
+                // Depois insere os novos
+                return $this->salvarHorariosAcademia($academiaId, $horarios);
+            } catch (PDOException $e) {
+                error_log("Erro ao atualizar horários da academia: " . $e->getMessage());
+                return false;
+            }
+        }
+        
+        public function uploadESalvarFotoPerfil($data) {
+            try {
+                // Verificar se há arquivo enviado
+                if (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
+                    return ['success' => false, 'error' => 'Nenhum arquivo enviado ou erro no upload'];
+                }
+
+                $arquivo = $_FILES['foto'];
+                
+                // Validar tipo de arquivo
+                $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!in_array($arquivo['type'], $tiposPermitidos)) {
+                    return ['success' => false, 'error' => 'Tipo de arquivo não permitido'];
+                }
+
+                // Validar tamanho (máximo 5MB)
+                if ($arquivo['size'] > 5 * 1024 * 1024) {
+                    return ['success' => false, 'error' => 'Arquivo muito grande. Máximo: 5MB'];
+                }
+
+                // Criar diretório se não existir
+                $diretorioDestino = __DIR__ . '/assets/images/uploads/';
+                if (!is_dir($diretorioDestino)) {
+                    mkdir($diretorioDestino, 0755, true);
+                }
+
+                // Gerar nome único para o arquivo
+                $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
+                $nomeArquivo = 'perfil_' . time() . '_' . uniqid() . '.' . $extensao;
+                $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+
+                // Mover arquivo para o diretório de destino
+                if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
+                    // URL relativa para acesso via frontend
+                    $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
+                    
+                    return [
+                        'success' => true,
+                        'url' => $urlRelativa,
+                        'nome_arquivo' => $nomeArquivo,
+                        'message' => 'Foto uploadada com sucesso'
+                    ];
+                } else {
+                    return ['success' => false, 'error' => 'Erro ao salvar arquivo'];
+                }
+
+            } catch (Exception $e) {
+                return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()];
+            }
         }
 
     }

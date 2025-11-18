@@ -67,6 +67,12 @@
             'method' => 'listarModalidades'
         ],
 
+        // Rota para upload e salvar foto de cadastro
+        'upload/salvar-foto-cadastro' => [
+            'controller' => 'CadastroController',
+            'method' => 'uploadESalvarFotoPerfil'
+        ],
+
         // Rota para upload de foto de perfil
         'upload/foto-perfil' => [
             'controller' => 'UploadController',
@@ -644,25 +650,25 @@
             'method' => 'meusConvites'
         ],
 
-        // Rotas para AcademiaController
+        // Rotas para AcademiasController
         'academia/painel' => [
-            'controller' => 'AcademiaController',
+            'controller' => 'AcademiasController',
             'method' => 'getPainelControle'
         ],
         'academia/solicitacao/enviar' => [
-            'controller' => 'AcademiaController',
+            'controller' => 'AcademiasController',
             'method' => 'enviarSolicitacaoVinculacao'
         ],
         'academia/solicitacao/(\d+)/aceitar' => [
-            'controller' => 'AcademiaController',
+            'controller' => 'AcademiasController',
             'method' => 'aceitarSolicitacao'
         ],
         'academia/solicitacao/(\d+)/recusar' => [
-            'controller' => 'AcademiaController',
+            'controller' => 'AcademiasController',
             'method' => 'recusarSolicitacao'
         ],
         'academia/desvincular' => [
-            'controller' => 'AcademiaController',
+            'controller' => 'AcademiasController',
             'method' => 'desvincularUsuario'
         ],
 
