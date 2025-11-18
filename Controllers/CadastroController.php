@@ -302,7 +302,6 @@
                 foreach ($camposObrigatorios as $campo) {
                     if (!isset($data[$campo]) || empty(trim($data[$campo]))) {
                         error_log("❌ Campo obrigatório faltando ou vazio: " . $campo);
-                        error_log("❌ Valor recebido: " . ($data[$campo] ?? 'NULL'));
                         http_response_code(400);
                         echo json_encode(['success' => false, 'error' => "Campo {$campo} é obrigatório"]);
                         return;
@@ -363,12 +362,12 @@
                 ");
 
                 $success = $stmt->execute([
-                    trim($data['nome_fantasia']), // nome
-                    trim($data['nome_fantasia']), // nome_fantasia
-                    trim($data['razao_social']),  // razao_social
-                    $cnpjFormatado,               // cnpj
-                    trim($data['email']),         // email
-                    $senhaHash,                   // senha
+                    trim($data['nome_fantasia']),
+                    trim($data['nome_fantasia']),
+                    trim($data['razao_social']),
+                    $cnpjFormatado,
+                    trim($data['email']),
+                    $senhaHash,
                     isset($data['telefone']) ? $this->formatarTelefone($data['telefone']) : null,
                     $data['tamanho_estrutura'] ?? null,
                     $data['capacidade_maxima'] ?? null,
@@ -387,10 +386,30 @@
                     $academiaId = $this->db->lastInsertId();
                     error_log("✅ Academia cadastrada com ID: " . $academiaId);
                     
+                    // 🔥 CORREÇÃO: Salvar endereço se existir
+                    if (isset($data['cep']) && !empty(trim($data['cep']))) {
+                        error_log("💾 Salvando endereço para academia ID: " . $academiaId);
+                        $errosEndereco = $this->validarDadosEndereco($data);
+                        if (empty($errosEndereco)) {
+                            $this->cadastrarEnderecoUsuario($academiaId, 'academia', $data);
+                            error_log("✅ Endereço salvo com sucesso");
+                        } else {
+                            error_log("⚠️ Endereço inválido: " . implode(', ', $errosEndereco));
+                        }
+                    }
+                    
+                    // 🔥 CORREÇÃO: Salvar modalidades se existirem
+                    if (isset($data['modalidades']) && is_array($data['modalidades']) && !empty($data['modalidades'])) {
+                        error_log("💾 Salvando modalidades para academia ID: " . $academiaId);
+                        $this->vincularModalidadesAcademia($academiaId, $data['modalidades']);
+                        error_log("✅ Modalidades salvas: " . count($data['modalidades']));
+                    }
+                    
                     // Salvar horários se existirem
                     if (isset($data['horarios']) && is_array($data['horarios'])) {
                         error_log("💾 Salvando horários para academia ID: " . $academiaId);
                         $this->salvarHorariosAcademia($academiaId, $data['horarios']);
+                        error_log("✅ Horários salvos");
                     }
                     
                     // Criar assinatura para o plano
@@ -766,6 +785,67 @@
             return $errors;
         }
 
+        public function processarCadastroCompleto($data) {
+            try {
+                // 🔥 CORREÇÃO: Verificar se é FormData ou JSON
+                $dados = $data;
+                if (empty($data) && isset($_POST) && !empty($_POST)) {
+                    // Se veio como FormData, usar $_POST
+                    $dados = $_POST;
+                    
+                    // Processar arrays do FormData
+                    if (isset($_POST['modalidades']) && is_array($_POST['modalidades'])) {
+                        $dados['modalidades'] = $_POST['modalidades'];
+                    }
+                }
+
+                error_log("📥 Dados recebidos para cadastro completo: " . json_encode($dados));
+
+                // Determinar tipo de usuário e ID
+                $tipoUsuario = null;
+                $idUsuario = null;
+
+                if (isset($dados['idAluno'])) {
+                    $tipoUsuario = 'aluno';
+                    $idUsuario = $dados['idAluno'];
+                } elseif (isset($dados['idPersonal'])) {
+                    $tipoUsuario = 'personal';
+                    $idUsuario = $dados['idPersonal'];
+                } elseif (isset($dados['idAcademia'])) {
+                    $tipoUsuario = 'academia';
+                    $idUsuario = $dados['idAcademia'];
+                }
+
+                if (!$idUsuario || !$tipoUsuario) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'ID ou tipo de usuário não identificado']);
+                    return;
+                }
+
+                // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
+                $fotoUrl = $dados['foto_url'] ?? null;
+
+                // Chamar método específico para cada tipo
+                switch ($tipoUsuario) {
+                    case 'aluno':
+                        return $this->completarCadastroAluno($dados);
+                    case 'personal':
+                        return $this->completarCadastroPersonal($dados);
+                    case 'academia':
+                        return $this->completarCadastroAcademia($dados);
+                    default:
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'Tipo de usuário inválido']);
+                        return;
+                }
+
+            } catch (Exception $e) {
+                error_log("❌ Erro geral no processarCadastroCompleto: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+        }
+
         public function completarCadastroAcademia($data) {
             try {
                 $idAcademia = $data['idAcademia'] ?? null;
@@ -774,6 +854,9 @@
                     echo json_encode(['success' => false, 'error' => 'ID da academia é obrigatório']);
                     return;
                 }
+
+                // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
+                $fotoUrl = $data['foto_url'] ?? null;
 
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
@@ -786,17 +869,9 @@
                     WHERE idAcademia = ?
                 ");
 
-                $enderecoCompleto = implode(', ', array_filter([
-                    $data['logradouro'] ?? null,
-                    $data['numero'] ?? null,
-                    $data['bairro'] ?? null,
-                    $data['cidade'] ?? null,
-                    $data['estado'] ?? null
-                ]));
-
                 $success = $stmt->execute([
                     $data['sobre'] ?? null,
-                    $data['foto_url'] ?? null,
+                    $fotoUrl, // 🔥 URL da foto
                     $data['treinos_adaptados'] ?? 0,
                     $data['tamanho_estrutura'] ?? null,
                     $data['capacidade_maxima'] ?? null,
@@ -825,7 +900,8 @@
                     http_response_code(200);
                     echo json_encode([
                         'success' => true,
-                        'message' => 'Cadastro completado com sucesso'
+                        'message' => 'Cadastro completado com sucesso',
+                        'foto_url' => $fotoUrl
                     ]);
                 } else {
                     http_response_code(400);
@@ -840,7 +916,19 @@
 
         public function completarCadastroAluno($data) {
             try {
-                $idAluno = $data['idAluno'] ?? null;
+                // 🔥 CORREÇÃO: Verificar se é FormData ou JSON
+                $dados = $data;
+                if (empty($data) && isset($_POST) && !empty($_POST)) {
+                    // Se veio como FormData, usar $_POST
+                    $dados = $_POST;
+                    
+                    // Processar modalidades do FormData
+                    if (isset($_POST['modalidades']) && is_array($_POST['modalidades'])) {
+                        $dados['modalidades'] = $_POST['modalidades'];
+                    }
+                }
+
+                $idAluno = $dados['idAluno'] ?? null;
                 if (!$idAluno) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'ID do aluno é obrigatório']);
@@ -848,21 +936,15 @@
                 }
 
                 // Validar dados do perfil
-                $erros = $this->validarDadosPerfil($data);
+                $erros = $this->validarDadosPerfil($dados);
                 if (!empty($erros)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => implode(', ', $erros)]);
                     return;
                 }
 
-                // PROCESSAR UPLOAD DE FOTO SE EXISTIR
-                $fotoUrl = $data['foto_url'] ?? null;
-                if (!$fotoUrl && isset($_FILES['foto'])) {
-                    $uploadResult = $this->uploadESalvarFotoPerfil($data);
-                    if ($uploadResult['success']) {
-                        $fotoUrl = $uploadResult['url'];
-                    }
-                }
+                // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
+                $fotoUrl = $dados['foto_url'] ?? null;
 
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
@@ -873,20 +955,20 @@
                 ");
 
                 $success = $stmt->execute([
-                    $data['data_nascimento'] ?? null,
-                    $data['genero'] ?? null,
-                    $data['altura'] ?? null,
-                    $data['meta'] ?? null,
-                    $data['treinoTipo'] ?? null,
-                    $data['treinos_adaptados'] ?? 0,
+                    $dados['data_nascimento'] ?? null,
+                    $dados['genero'] ?? null,
+                    $dados['altura'] ?? null,
+                    $dados['meta'] ?? null,
+                    $dados['treinoTipo'] ?? null,
+                    $dados['treinos_adaptados'] ?? 0,
                     $fotoUrl, // URL da foto (pode ser null)
                     $idAluno
                 ]);
 
                 if ($success) {
                     // Processar modalidades
-                    if (isset($data['modalidades']) && is_array($data['modalidades'])) {
-                        $this->vincularModalidadesAluno($idAluno, $data['modalidades']);
+                    if (isset($dados['modalidades']) && is_array($dados['modalidades'])) {
+                        $this->vincularModalidadesAluno($idAluno, $dados['modalidades']);
                     }
 
                     http_response_code(200);
@@ -901,6 +983,7 @@
                 }
 
             } catch (PDOException $e) {
+                error_log("❌ PDOException: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erro ao completar cadastro: ' . $e->getMessage()]);
             }
@@ -923,7 +1006,10 @@
                     return;
                 }
 
-                // Atualizar dados principais - foto_url é opcional
+                // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
+                $fotoUrl = $data['foto_url'] ?? null;
+
+                // Atualizar dados principais
                 $stmt = $this->db->prepare("
                     UPDATE personal 
                     SET data_nascimento = ?, genero = ?, foto_url = ?, 
@@ -934,7 +1020,7 @@
                 $success = $stmt->execute([
                     $data['data_nascimento'] ?? null,
                     $data['genero'] ?? null,
-                    $data['foto_url'] ?? null, // URL da foto (opcional)
+                    $fotoUrl, // 🔥 URL da foto
                     $data['sobre'] ?? null,
                     $data['treinos_adaptados'] ?? 0,
                     $idPersonal
@@ -949,7 +1035,8 @@
                     http_response_code(200);
                     echo json_encode([
                         'success' => true,
-                        'message' => 'Cadastro completado com sucesso'
+                        'message' => 'Cadastro completado com sucesso',
+                        'foto_url' => $fotoUrl
                     ]);
                 } else {
                     http_response_code(400);
@@ -995,17 +1082,25 @@
         }
 
         private function vincularModalidadesAcademia($idAcademia, $modalidades) {
-            // Limpar modalidades existentes
-            $stmt = $this->db->prepare("DELETE FROM modalidades_academia WHERE idAcademia = ?");
-            $stmt->execute([$idAcademia]);
+            try {
+                // Limpar modalidades existentes
+                $stmt = $this->db->prepare("DELETE FROM modalidades_academia WHERE idAcademia = ?");
+                $stmt->execute([$idAcademia]);
 
-            // Inserir novas modalidades
-            $stmt = $this->db->prepare("INSERT INTO modalidades_academia (idAcademia, idModalidade) VALUES (?, ?)");
-            
-            foreach ($modalidades as $idModalidade) {
-                if (is_numeric($idModalidade)) {
-                    $stmt->execute([$idAcademia, $idModalidade]);
+                // Inserir novas modalidades
+                $stmt = $this->db->prepare("INSERT INTO modalidades_academia (idAcademia, idModalidade) VALUES (?, ?)");
+                
+                foreach ($modalidades as $idModalidade) {
+                    if (is_numeric($idModalidade)) {
+                        $stmt->execute([$idAcademia, $idModalidade]);
+                    }
                 }
+                
+                error_log("✅ Modalidades vinculadas: " . count($modalidades));
+                return true;
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao vincular modalidades: " . $e->getMessage());
+                return false;
             }
         }
 
@@ -1116,57 +1211,65 @@
             }
         }
         
-        public function uploadESalvarFotoPerfil($data) {
-            try {
-                // Verificar se há arquivo enviado
-                if (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
-                    return ['success' => false, 'error' => 'Nenhum arquivo enviado ou erro no upload'];
-                }
+        // public function uploadESalvarFotoPerfil($data) {
+        //     try {
+        //         // Verificar se há arquivo enviado
+        //         if (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
+        //             return ['success' => false, 'error' => 'Nenhum arquivo enviado ou erro no upload'];
+        //         }
 
-                $arquivo = $_FILES['foto'];
+        //         $arquivo = $_FILES['foto'];
                 
-                // Validar tipo de arquivo
-                $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!in_array($arquivo['type'], $tiposPermitidos)) {
-                    return ['success' => false, 'error' => 'Tipo de arquivo não permitido'];
-                }
+        //         // Validar tipo de arquivo
+        //         $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        //         if (!in_array($arquivo['type'], $tiposPermitidos)) {
+        //             return ['success' => false, 'error' => 'Tipo de arquivo não permitido'];
+        //         }
 
-                // Validar tamanho (máximo 5MB)
-                if ($arquivo['size'] > 5 * 1024 * 1024) {
-                    return ['success' => false, 'error' => 'Arquivo muito grande. Máximo: 5MB'];
-                }
+        //         // Validar tamanho (máximo 5MB)
+        //         if ($arquivo['size'] > 5 * 1024 * 1024) {
+        //             return ['success' => false, 'error' => 'Arquivo muito grande. Máximo: 5MB'];
+        //         }
 
-                // Criar diretório se não existir
-                $diretorioDestino = __DIR__ . '/assets/images/uploads/';
-                if (!is_dir($diretorioDestino)) {
-                    mkdir($diretorioDestino, 0755, true);
-                }
+        //         // 🔥 CORREÇÃO: Caminho correto
+        //         $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
+        //         if (!is_dir($diretorioDestino)) {
+        //             mkdir($diretorioDestino, 0755, true);
+        //         }
 
-                // Gerar nome único para o arquivo
-                $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
-                $nomeArquivo = 'perfil_' . time() . '_' . uniqid() . '.' . $extensao;
-                $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+        //         // Gerar nome único para o arquivo
+        //         $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
+        //         $nomeArquivo = 'perfil_' . time() . '_' . uniqid() . '.' . $extensao;
+        //         $caminhoCompleto = $diretorioDestino . $nomeArquivo;
 
-                // Mover arquivo para o diretório de destino
-                if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
-                    // URL relativa para acesso via frontend
-                    $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
+        //         // Mover arquivo para o diretório de destino
+        //         if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
+        //             // Verificar se o arquivo realmente existe
+        //             if (!file_exists($caminhoCompleto)) {
+        //                 return ['success' => false, 'error' => 'Arquivo não foi salvo no servidor'];
+        //             }
                     
-                    return [
-                        'success' => true,
-                        'url' => $urlRelativa,
-                        'nome_arquivo' => $nomeArquivo,
-                        'message' => 'Foto uploadada com sucesso'
-                    ];
-                } else {
-                    return ['success' => false, 'error' => 'Erro ao salvar arquivo'];
-                }
+        //             // URL relativa para acesso via frontend
+        //             $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
+                    
+        //             error_log("✅ Foto salva em: " . $caminhoCompleto);
+        //             error_log("✅ URL relativa: " . $urlRelativa);
+                    
+        //             return [
+        //                 'success' => true,
+        //                 'url' => $urlRelativa,
+        //                 'nome_arquivo' => $nomeArquivo,
+        //                 'message' => 'Foto uploadada com sucesso'
+        //             ];
+        //         } else {
+        //             error_log("❌ Falha ao mover arquivo para: " . $caminhoCompleto);
+        //             return ['success' => false, 'error' => 'Erro ao salvar arquivo no servidor'];
+        //         }
 
-            } catch (Exception $e) {
-                return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()];
-            }
-        }
+        //     } catch (Exception $e) {
+        //         error_log("❌ Exception: " . $e->getMessage());
+        //         return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()];
+        //     }
+        // }
 
     }
-
-?>

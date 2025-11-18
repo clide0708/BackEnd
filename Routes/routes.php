@@ -50,6 +50,10 @@
             'controller' => 'CadastroController',
             'method' => 'verificarCnpj'
         ],
+        'cadastro/processar-completo' => [
+            'controller' => 'CadastroController',
+            'method' => 'processarCadastroCompleto'
+        ],
         'cadastro/completar-aluno' => [
             'controller' => 'CadastroController',
             'method' => 'completarCadastroAluno'
@@ -65,12 +69,6 @@
         'cadastro/modalidades' => [
             'controller' => 'CadastroController',
             'method' => 'listarModalidades'
-        ],
-
-        // Rota para upload e salvar foto de cadastro
-        'upload/salvar-foto-cadastro' => [
-            'controller' => 'CadastroController',
-            'method' => 'uploadESalvarFotoPerfil'
         ],
 
         // Rota para upload de foto de perfil
@@ -751,6 +749,7 @@
         'upload/obter-foto-usuario',
         'upload/deletar-foto',
         'cadastro/modalidades',
+        'cadastro/processar-completo',
         'cadastro/completar-aluno',
         'cadastro/completar-personal', 
         'cadastro/completar-academia',
@@ -828,6 +827,7 @@
             'upload/obter-foto-usuario',
             'upload/deletar-foto',
             'cadastro/modalidades',
+            'cadastro/processar-completo',
             'cadastro/completar-aluno',
             'cadastro/completar-personal', 
             'cadastro/completar-academia',

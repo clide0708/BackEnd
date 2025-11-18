@@ -43,7 +43,7 @@
                 }
 
                 // Criar diretório se não existir
-                $diretorioDestino = __DIR__ . '/../../public/assets/images/uploads/';
+                $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
                 if (!is_dir($diretorioDestino)) {
                     mkdir($diretorioDestino, 0755, true);
                 }
@@ -58,6 +58,14 @@
                     // URL relativa para acesso via frontend
                     $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
                     
+                    // 🔥 VERIFICAR SE O ARQUIVO REALMENTE FOI CRIADO
+                    if (file_exists($caminhoCompleto)) {
+                        error_log("✅ Arquivo salvo com sucesso: " . $caminhoCompleto);
+                        error_log("✅ Tamanho do arquivo: " . filesize($caminhoCompleto) . " bytes");
+                    } else {
+                        error_log("❌ ERRO: Arquivo não foi criado: " . $caminhoCompleto);
+                    }
+                    
                     http_response_code(200);
                     echo json_encode([
                         'success' => true,
@@ -66,11 +74,17 @@
                         'message' => 'Foto uploadada com sucesso'
                     ]);
                 } else {
+                    error_log("❌ Erro ao mover arquivo uploadado");
+                    error_log("❌ Caminho destino: " . $caminhoCompleto);
+                    error_log("❌ Caminho temporário: " . $arquivo['tmp_name']);
+                    error_log("❌ Erro upload: " . $arquivo['error']);
+                    
                     http_response_code(500);
-                    echo json_encode(['success' => false, 'error' => 'Erro ao salvar arquivo']);
+                    echo json_encode(['success' => false, 'error' => 'Erro ao salvar arquivo no servidor']);
                 }
 
             } catch (Exception $e) {
+                error_log("❌ Exception no upload: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
@@ -200,7 +214,7 @@
 
                 // Extrair nome do arquivo da URL
                 $nomeArquivo = basename($fotoUrl);
-                $diretorioDestino = __DIR__ . '/../../public/assets/images/uploads/';
+                $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
                 $caminhoCompleto = $diretorioDestino . $nomeArquivo;
 
                 if (file_exists($caminhoCompleto) && is_file($caminhoCompleto)) {
@@ -221,7 +235,7 @@
                     return;
                 }
 
-                $diretorioDestino = __DIR__ . '/../../public/assets/images/uploads/';
+                $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
                 $caminhoCompleto = $diretorioDestino . $data['nome_arquivo'];
 
                 if (file_exists($caminhoCompleto) && unlink($caminhoCompleto)) {
