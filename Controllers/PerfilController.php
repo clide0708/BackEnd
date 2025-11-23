@@ -28,14 +28,17 @@
                     case 'aluno':
                         $tabela = 'alunos';
                         $campoId = 'idAluno';
+                        $camposDataNascimento = ", DATE_FORMAT(data_nascimento, '%Y-%m-%d') as data_nascimento_corrigida";
                         break;
                     case 'personal':
                         $tabela = 'personal';
                         $campoId = 'idPersonal';
+                        $camposDataNascimento = ", DATE_FORMAT(data_nascimento, '%Y-%m-%d') as data_nascimento_corrigida";
                         break;
                     case 'academia':
                         $tabela = 'academias';
                         $campoId = 'idAcademia';
+                        $camposDataNascimento = ""; // Academia não tem data_nascimento
                         break;
                     default:
                         http_response_code(400);
@@ -43,13 +46,13 @@
                         return;
                 }
 
-                // 🔥 CORREÇÃO CRÍTICA: Buscar dados formatando data corretamente
-                $stmt = $this->db->prepare("
-                    SELECT *,
-                    DATE_FORMAT(data_nascimento, '%Y-%m-%d') as data_nascimento_corrigida
-                    FROM {$tabela} 
-                    WHERE {$campoId} = ? AND status_conta = 'Ativa'
-                ");
+                // 🔥 CORREÇÃO: Query dinâmica baseada no tipo de usuário
+                $sql = "SELECT * {$camposDataNascimento} FROM {$tabela} WHERE {$campoId} = ? AND status_conta = 'Ativa'";
+                
+                error_log("📊 Executando query: " . $sql);
+                error_log("📊 Parâmetros: [" . $idUsuario . "]");
+                
+                $stmt = $this->db->prepare($sql);
                 $stmt->execute([$idUsuario]);
                 $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -59,32 +62,26 @@
                     return;
                 }
 
-                // 🔥 CORREÇÃO: Usar a data corrigida
+                // 🔥 CORREÇÃO: Usar a data corrigida apenas se existir
                 if (isset($usuario['data_nascimento_corrigida'])) {
                     $usuario['data_nascimento'] = $usuario['data_nascimento_corrigida'];
                     unset($usuario['data_nascimento_corrigida']);
                 }
 
-                // 🔥 CORREÇÃO: Buscar modalidades completas (com nomes)
+                // 🔥 CORREÇÃO: Buscar modalidades completas
                 $modalidades = $this->buscarModalidadesUsuarioComNomes($tipoUsuario, $idUsuario);
 
                 // Buscar endereço
                 $endereco = $this->buscarEnderecoUsuario($idUsuario, $tipoUsuario);
 
-                // 🔥 NOVO: Buscar horários da academia (se for academia)
-                $horarios = [];
-                if ($tipoUsuario === 'academia') {
-                    $horarios = $this->buscarHorariosAcademia($idUsuario);
-                }
-
                 // Preparar resposta
                 $perfilCompleto = array_merge($usuario, [
                     'modalidades' => $modalidades,
-                    'endereco' => $endereco,
-                    'horarios' => $horarios
+                    'endereco' => $endereco
                 ]);
 
                 error_log("✅ Perfil carregado com sucesso - Modalidades: " . count($modalidades));
+                error_log("✅ Dados do usuário: " . json_encode($usuario));
 
                 http_response_code(200);
                 echo json_encode([
@@ -93,9 +90,14 @@
                 ]);
 
             } catch (PDOException $e) {
-                error_log("❌ Erro ao buscar perfil completo: " . $e->getMessage());
+                error_log("❌ Erro PDO ao buscar perfil completo: " . $e->getMessage());
+                error_log("❌ Trace: " . $e->getTraceAsString());
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
+            } catch (Exception $e) {
+                error_log("❌ Erro geral ao buscar perfil completo: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
         }
 
@@ -192,14 +194,9 @@
                 
                 $modalidades = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // 🔥 CORREÇÃO: Retornar array de IDs para compatibilidade
-                $modalidadesIds = array_map(function($modalidade) {
-                    return (int)$modalidade['idModalidade'];
-                }, $modalidades);
+                error_log("🎯 Modalidades encontradas para $tipoUsuario $idUsuario: " . json_encode($modalidades));
                 
-                error_log("🎯 Modalidades encontradas: " . json_encode($modalidadesIds));
-                
-                return $modalidadesIds;
+                return $modalidades;
                 
             } catch (PDOException $e) {
                 error_log("❌ Erro ao buscar modalidades: " . $e->getMessage());
@@ -738,7 +735,7 @@
                 }
 
                 // Campos permitidos para atualização
-                $camposPermitidos = ['nome', 'data_nascimento', 'genero', 'altura', 'meta', 'sobre', 'numTel', 'foto_url'];
+                $camposPermitidos = ['nome', 'data_nascimento', 'genero', 'altura', 'meta', 'sobre', 'numTel', 'foto_url', 'telefone'];
                 $camposAtualizacao = [];
                 $valores = [];
 
@@ -900,6 +897,8 @@
                     return;
                 }
 
+                error_log("🎯 Atualizando perfil - Tipo: $tipoUsuario, ID: $idUsuario, Dados: " . json_encode($data));
+
                 // Determinar tabela de atualização
                 switch ($tipoUsuario) {
                     case 'aluno':
@@ -925,13 +924,13 @@
                 $valores = [];
 
                 // Campos comuns a todos os tipos
-                $camposComuns = ['nome', 'data_nascimento', 'genero', 'foto_url', 'numTel'];
+                $camposComuns = ['nome', 'numTel', 'foto_url', 'telefone'];
                 
-                // Campos específicos por tipo
+                // 🔥 CORREÇÃO: Campos específicos por tipo
                 $camposEspecificos = [
-                    'aluno' => ['altura', 'peso', 'meta', 'treinoTipo', 'treinos_adaptados'],
-                    'personal' => ['sobre', 'treinos_adaptados'],
-                    'academia' => ['sobre', 'tamanho_estrutura', 'capacidade_maxima', 'ano_fundacao', 
+                    'aluno' => ['data_nascimento', 'genero', 'altura', 'peso', 'meta', 'treinoTipo', 'treinos_adaptados'],
+                    'personal' => ['data_nascimento', 'genero', 'sobre', 'treinos_adaptados', 'cref_numero', 'cref_categoria', 'cref_regional'],
+                    'academia' => ['nome_fantasia', 'razao_social', 'telefone', 'sobre', 'tamanho_estrutura', 'capacidade_maxima', 'ano_fundacao', 
                                 'estacionamento', 'vestiario', 'ar_condicionado', 'wifi', 
                                 'totem_de_carregamento_usb', 'area_descanso', 'avaliacao_fisica']
                 ];
@@ -948,35 +947,41 @@
                         } else {
                             $valores[] = $data[$campo];
                         }
+                        
+                        error_log("📝 Campo $campo: " . $data[$campo]);
                     }
                 }
 
                 // Atualizar dados principais
                 if (!empty($camposAtualizacao)) {
-                    $valores[] = $idUsuario;
+                    $valoresPrincipais = $valores;
+                    $valoresPrincipais[] = $idUsuario;
+                    
                     $sql = "UPDATE $tabela SET " . implode(', ', $camposAtualizacao) . " WHERE $campoId = ?";
+                    error_log("📊 SQL Principal: " . $sql);
+                    error_log("📊 Valores: " . json_encode($valoresPrincipais));
                     
                     $stmt = $this->db->prepare($sql);
-                    $success = $stmt->execute($valores);
+                    $success = $stmt->execute($valoresPrincipais);
                     
                     if (!$success) {
                         throw new Exception("Erro ao atualizar dados principais");
                     }
+                    
+                    error_log("✅ Dados principais atualizados com sucesso");
                 }
 
                 // 🔥 ATUALIZAR MODALIDADES
                 if (isset($data['modalidades']) && is_array($data['modalidades'])) {
+                    error_log("🎯 Atualizando modalidades: " . json_encode($data['modalidades']));
                     $this->atualizarModalidadesUsuario($tipoUsuario, $idUsuario, $data['modalidades']);
+                } else {
+                    error_log("⚠️ Nenhuma modalidade recebida para atualização");
                 }
 
                 // 🔥 ATUALIZAR ENDEREÇO
                 if (isset($data['endereco']) && is_array($data['endereco'])) {
                     $this->atualizarEnderecoUsuario($idUsuario, $tipoUsuario, $data['endereco']);
-                }
-
-                // 🔥 ATUALIZAR ACADEMIA (para alunos e personais) E ENVIAR SOLICITAÇÃO
-                if (in_array($tipoUsuario, ['aluno', 'personal']) && isset($data['idAcademia'])) {
-                    $this->atualizarAcademiaEEnviarSolicitacao($tipoUsuario, $idUsuario, $data['idAcademia'], $data['idAcademiaOriginal'] ?? null);
                 }
 
                 http_response_code(200);
@@ -987,7 +992,8 @@
                 ]);
 
             } catch (PDOException $e) {
-                error_log("❌ Erro ao atualizar perfil completo: " . $e->getMessage());
+                error_log("❌ Erro PDO ao atualizar perfil completo: " . $e->getMessage());
+                error_log("❌ Trace: " . $e->getTraceAsString());
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
             } catch (Exception $e) {
