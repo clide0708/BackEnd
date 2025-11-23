@@ -871,14 +871,23 @@
                 $idUsuario = null;
 
                 if (isset($dados['idAluno'])) {
-                    $tipoUsuario = 'aluno';
-                    $idUsuario = $dados['idAluno'];
+                $tipoUsuario = 'aluno';
+                $idUsuario = $dados['idAluno'];
+                
+                // 🔥 APENAS para aluno: validar dados completos
+                $erros = $this->validarDadosPerfilAluno($dados);
+                if (!empty($erros)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => implode(', ', $erros)]);
+                    return;
+                }
                 } elseif (isset($dados['idPersonal'])) {
-                    $tipoUsuario = 'personal';
-                    $idUsuario = $dados['idPersonal'];
+                $tipoUsuario = 'personal';
+                $idUsuario = $dados['idPersonal'];
+                // 🔥 Para personal: NÃO validar peso, altura, etc.
                 } elseif (isset($dados['idAcademia'])) {
-                    $tipoUsuario = 'academia';
-                    $idUsuario = $dados['idAcademia'];
+                $tipoUsuario = 'academia';
+                $idUsuario = $dados['idAcademia'];
                 }
 
                 if (!$idUsuario || !$tipoUsuario) {
@@ -1028,12 +1037,15 @@
                     return;
                 }
 
-                // 🔥 VALIDAÇÃO EXPANDIDA: Incluir peso e treinoTipo
-                $erros = $this->validarDadosPerfilAluno($dados);
+                $erros = [];
+                if (isset($data['idAluno'])) {
+                $erros = $this->validarDadosPerfilAluno($data);
+                }
+
                 if (!empty($erros)) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => implode(', ', $erros)]);
-                    return;
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => implode(', ', $erros)]);
+                return;
                 }
 
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
@@ -1349,30 +1361,12 @@
         private function validarDadosPerfilAluno($data) {
             $erros = [];
 
-            // Validações básicas
-            if (empty($data['data_nascimento'])) {
-                $erros[] = 'Data de nascimento é obrigatória';
-            } else {
-                $dataNasc = DateTime::createFromFormat('Y-m-d', $data['data_nascimento']);
-                $hoje = new DateTime();
-                
-                if (!$dataNasc || $dataNasc > $hoje) {
-                    $erros[] = 'Data de nascimento inválida';
-                } else {
-                    $idade = $hoje->diff($dataNasc)->y;
-                    if ($idade < 12 || $idade > 120) {
-                        $erros[] = 'Idade deve estar entre 12 e 120 anos';
-                    }
-                }
-            }
-
             if (empty($data['genero'])) {
                 $erros[] = 'Gênero é obrigatório';
             } else if (!in_array($data['genero'], ['Masculino', 'Feminino', 'Outro'])) {
                 $erros[] = 'Gênero inválido';
             }
 
-            // 🔥 NOVAS VALIDAÇÕES: Peso e Altura
             if (empty($data['altura'])) {
                 $erros[] = 'Altura é obrigatória';
             } else if ($data['altura'] < 100 || $data['altura'] > 250) {
@@ -1385,18 +1379,32 @@
                 $erros[] = 'Peso deve estar entre 30kg e 300kg';
             }
 
-            // 🔥 NOVA VALIDAÇÃO: Tipo de Treino
+            if (empty($data['data_nascimento'])) {
+                $erros[] = 'Data de nascimento é obrigatória';
+            } else {
+                $dataNasc = DateTime::createFromFormat('Y-m-d', $data['data_nascimento']);
+                $hoje = new DateTime();
+                
+                if (!$dataNasc || $dataNasc > $hoje) {
+                $erros[] = 'Data de nascimento inválida';
+                } else {
+                $idade = $hoje->diff($dataNasc)->y;
+                if ($idade < 10 || $idade > 120) {
+                    $erros[] = 'Idade deve estar entre 10 e 120 anos';
+                }
+                }
+            }
+
             if (empty($data['treinoTipo'])) {
                 $erros[] = 'Nível de atividade é obrigatório';
             } else if (!in_array($data['treinoTipo'], ['Sedentário', 'Leve', 'Moderado', 'Intenso'])) {
                 $erros[] = 'Nível de atividade inválido';
             }
 
-            // Validação de modalidades
             if (empty($data['modalidades']) || !is_array($data['modalidades']) || count($data['modalidades']) === 0) {
                 $erros[] = 'Selecione pelo menos uma modalidade';
             }
-
+            
             return $erros;
         }
 

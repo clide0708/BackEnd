@@ -71,10 +71,17 @@
                 // Buscar endereço
                 $endereco = $this->buscarEnderecoUsuario($idUsuario, $tipoUsuario);
 
+                // 🔥 NOVO: Buscar horários da academia (se for academia)
+                $horarios = [];
+                if ($tipoUsuario === 'academia') {
+                    $horarios = $this->buscarHorariosAcademia($idUsuario);
+                }
+
                 // Preparar resposta
                 $perfilCompleto = array_merge($usuario, [
                     'modalidades' => $modalidades,
-                    'endereco' => $endereco
+                    'endereco' => $endereco,
+                    'horarios' => $horarios
                 ]);
 
                 error_log("✅ Perfil carregado com sucesso - Modalidades: " . count($modalidades));
@@ -89,6 +96,24 @@
                 error_log("❌ Erro ao buscar perfil completo: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
+            }
+        }
+
+        // 🔥 NOVO: Método para buscar horários da academia
+        private function buscarHorariosAcademia($idAcademia) {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT dia_semana, aberto_24h, horario_abertura, horario_fechamento, fechado 
+                    FROM academia_horarios 
+                    WHERE idAcademia = ?
+                    ORDER BY FIELD(dia_semana, 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo')
+                ");
+                $stmt->execute([$idAcademia]);
+                
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao buscar horários da academia: " . $e->getMessage());
+                return [];
             }
         }
 
