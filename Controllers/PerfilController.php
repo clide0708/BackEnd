@@ -43,9 +43,11 @@
                         return;
                 }
 
-                // Buscar dados principais
+                // 🔥 CORREÇÃO CRÍTICA: Buscar dados formatando data corretamente
                 $stmt = $this->db->prepare("
-                    SELECT * FROM {$tabela} 
+                    SELECT *,
+                    DATE_FORMAT(data_nascimento, '%Y-%m-%d') as data_nascimento_corrigida
+                    FROM {$tabela} 
                     WHERE {$campoId} = ? AND status_conta = 'Ativa'
                 ");
                 $stmt->execute([$idUsuario]);
@@ -57,8 +59,14 @@
                     return;
                 }
 
-                // Buscar modalidades
-                $modalidades = $this->buscarModalidadesUsuario($tipoUsuario, $idUsuario);
+                // 🔥 CORREÇÃO: Usar a data corrigida
+                if (isset($usuario['data_nascimento_corrigida'])) {
+                    $usuario['data_nascimento'] = $usuario['data_nascimento_corrigida'];
+                    unset($usuario['data_nascimento_corrigida']);
+                }
+
+                // 🔥 CORREÇÃO: Buscar modalidades completas (com nomes)
+                $modalidades = $this->buscarModalidadesUsuarioComNomes($tipoUsuario, $idUsuario);
 
                 // Buscar endereço
                 $endereco = $this->buscarEnderecoUsuario($idUsuario, $tipoUsuario);
@@ -68,6 +76,8 @@
                     'modalidades' => $modalidades,
                     'endereco' => $endereco
                 ]);
+
+                error_log("✅ Perfil carregado com sucesso - Modalidades: " . count($modalidades));
 
                 http_response_code(200);
                 echo json_encode([
@@ -105,20 +115,71 @@
                     return [];
             }
 
-            $stmt = $this->db->prepare("
-                SELECT m.idModalidade, m.nome 
-                FROM {$tabelaModalidades} um
-                JOIN modalidades m ON um.idModalidade = m.idModalidade
-                WHERE um.{$campoId} = ?
-            ");
-            $stmt->execute([$idUsuario]);
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT m.idModalidade 
+                    FROM {$tabelaModalidades} um
+                    JOIN modalidades m ON um.idModalidade = m.idModalidade
+                    WHERE um.{$campoId} = ?
+                ");
+                $stmt->execute([$idUsuario]);
+                
+                $modalidades = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+                
+                error_log("✅ Modalidades encontradas para $tipoUsuario $idUsuario: " . json_encode($modalidades));
+                
+                return $modalidades;
+                
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao buscar modalidades: " . $e->getMessage());
+                return [];
+            }
+        }
+
+        private function buscarModalidadesUsuarioComNomes($tipoUsuario, $idUsuario) {
+            $tabelaModalidades = '';
             
-            $modalidades = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Retornar apenas IDs para compatibilidade
-            return array_map(function($modalidade) {
-                return $modalidade['idModalidade'];
-            }, $modalidades);
+            switch ($tipoUsuario) {
+                case 'aluno':
+                    $tabelaModalidades = 'modalidades_aluno';
+                    $campoId = 'idAluno';
+                    break;
+                case 'personal':
+                    $tabelaModalidades = 'modalidades_personal';
+                    $campoId = 'idPersonal';
+                    break;
+                case 'academia':
+                    $tabelaModalidades = 'modalidades_academia';
+                    $campoId = 'idAcademia';
+                    break;
+                default:
+                    return [];
+            }
+
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT m.idModalidade, m.nome 
+                    FROM {$tabelaModalidades} um
+                    JOIN modalidades m ON um.idModalidade = m.idModalidade
+                    WHERE um.{$campoId} = ?
+                ");
+                $stmt->execute([$idUsuario]);
+                
+                $modalidades = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // 🔥 CORREÇÃO: Retornar array de IDs para compatibilidade
+                $modalidadesIds = array_map(function($modalidade) {
+                    return (int)$modalidade['idModalidade'];
+                }, $modalidades);
+                
+                error_log("🎯 Modalidades encontradas: " . json_encode($modalidadesIds));
+                
+                return $modalidadesIds;
+                
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao buscar modalidades: " . $e->getMessage());
+                return [];
+            }
         }
 
         /**
@@ -766,6 +827,330 @@
             } catch (Exception $e) {
                 http_response_code(400);
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
+        public function atualizarPerfilCompleto() {
+            header('Content-Type: application/json');
+            
+            try {
+                $data = json_decode(file_get_contents('php://input'), true);
+                
+                if (!isset($data['email']) || !isset($data['tipoUsuario'])) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Email e tipo de usuário são obrigatórios']);
+                    return;
+                }
+
+                $email = $data['email'];
+                $tipoUsuario = $data['tipoUsuario'];
+                
+                // Buscar usuário para obter ID
+                $queries = [
+                    'aluno' => "SELECT idAluno as id FROM alunos WHERE email = ?",
+                    'personal' => "SELECT idPersonal as id FROM personal WHERE email = ?",
+                    'academia' => "SELECT idAcademia as id FROM academias WHERE email = ?"
+                ];
+
+                $usuario = null;
+                $idUsuario = null;
+
+                foreach ($queries as $tipo => $sql) {
+                    if ($tipo === $tipoUsuario) {
+                        $stmt = $this->db->prepare($sql);
+                        $stmt->execute([$email]);
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($result) {
+                            $usuario = $result;
+                            $idUsuario = $result['id'];
+                            break;
+                        }
+                    }
+                }
+
+                if (!$usuario) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'Usuário não encontrado']);
+                    return;
+                }
+
+                // Determinar tabela de atualização
+                switch ($tipoUsuario) {
+                    case 'aluno':
+                        $tabela = 'alunos';
+                        $campoId = 'idAluno';
+                        break;
+                    case 'personal':
+                        $tabela = 'personal';
+                        $campoId = 'idPersonal';
+                        break;
+                    case 'academia':
+                        $tabela = 'academias';
+                        $campoId = 'idAcademia';
+                        break;
+                    default:
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'Tipo de usuário inválido']);
+                        return;
+                }
+
+                // 🔥 ATUALIZAÇÃO DOS DADOS PRINCIPAIS
+                $camposAtualizacao = [];
+                $valores = [];
+
+                // Campos comuns a todos os tipos
+                $camposComuns = ['nome', 'data_nascimento', 'genero', 'foto_url', 'numTel'];
+                
+                // Campos específicos por tipo
+                $camposEspecificos = [
+                    'aluno' => ['altura', 'peso', 'meta', 'treinoTipo', 'treinos_adaptados'],
+                    'personal' => ['sobre', 'treinos_adaptados'],
+                    'academia' => ['sobre', 'tamanho_estrutura', 'capacidade_maxima', 'ano_fundacao', 
+                                'estacionamento', 'vestiario', 'ar_condicionado', 'wifi', 
+                                'totem_de_carregamento_usb', 'area_descanso', 'avaliacao_fisica']
+                ];
+
+                $camposPermitidos = array_merge($camposComuns, $camposEspecificos[$tipoUsuario] ?? []);
+
+                foreach ($camposPermitidos as $campo) {
+                    if (isset($data[$campo])) {
+                        $camposAtualizacao[] = "$campo = ?";
+                        
+                        // Converter booleanos para inteiros
+                        if (is_bool($data[$campo])) {
+                            $valores[] = $data[$campo] ? 1 : 0;
+                        } else {
+                            $valores[] = $data[$campo];
+                        }
+                    }
+                }
+
+                // Atualizar dados principais
+                if (!empty($camposAtualizacao)) {
+                    $valores[] = $idUsuario;
+                    $sql = "UPDATE $tabela SET " . implode(', ', $camposAtualizacao) . " WHERE $campoId = ?";
+                    
+                    $stmt = $this->db->prepare($sql);
+                    $success = $stmt->execute($valores);
+                    
+                    if (!$success) {
+                        throw new Exception("Erro ao atualizar dados principais");
+                    }
+                }
+
+                // 🔥 ATUALIZAR MODALIDADES
+                if (isset($data['modalidades']) && is_array($data['modalidades'])) {
+                    $this->atualizarModalidadesUsuario($tipoUsuario, $idUsuario, $data['modalidades']);
+                }
+
+                // 🔥 ATUALIZAR ENDEREÇO
+                if (isset($data['endereco']) && is_array($data['endereco'])) {
+                    $this->atualizarEnderecoUsuario($idUsuario, $tipoUsuario, $data['endereco']);
+                }
+
+                // 🔥 ATUALIZAR ACADEMIA (para alunos e personais) E ENVIAR SOLICITAÇÃO
+                if (in_array($tipoUsuario, ['aluno', 'personal']) && isset($data['idAcademia'])) {
+                    $this->atualizarAcademiaEEnviarSolicitacao($tipoUsuario, $idUsuario, $data['idAcademia'], $data['idAcademiaOriginal'] ?? null);
+                }
+
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Perfil atualizado com sucesso',
+                    'idUsuario' => $idUsuario
+                ]);
+
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao atualizar perfil completo: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
+            } catch (Exception $e) {
+                error_log("❌ Erro geral ao atualizar perfil: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+        }
+
+        private function atualizarModalidadesUsuario($tipoUsuario, $idUsuario, $modalidades) {
+            $tabelaModalidades = '';
+            
+            switch ($tipoUsuario) {
+                case 'aluno':
+                    $tabelaModalidades = 'modalidades_aluno';
+                    $campoId = 'idAluno';
+                    break;
+                case 'personal':
+                    $tabelaModalidades = 'modalidades_personal';
+                    $campoId = 'idPersonal';
+                    break;
+                case 'academia':
+                    $tabelaModalidades = 'modalidades_academia';
+                    $campoId = 'idAcademia';
+                    break;
+                default:
+                    return false;
+            }
+
+            try {
+                // Limpar modalidades existentes
+                $stmt = $this->db->prepare("DELETE FROM {$tabelaModalidades} WHERE {$campoId} = ?");
+                $stmt->execute([$idUsuario]);
+
+                // Inserir novas modalidades
+                if (!empty($modalidades)) {
+                    $stmt = $this->db->prepare("INSERT INTO {$tabelaModalidades} ({$campoId}, idModalidade) VALUES (?, ?)");
+                    
+                    foreach ($modalidades as $idModalidade) {
+                        if (is_numeric($idModalidade)) {
+                            $stmt->execute([$idUsuario, $idModalidade]);
+                        }
+                    }
+                }
+                
+                error_log("✅ Modalidades atualizadas: " . count($modalidades));
+                return true;
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao atualizar modalidades: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function atualizarEnderecoUsuario($idUsuario, $tipoUsuario, $endereco) {
+            try {
+                // Verificar se endereço já existe
+                $stmt = $this->db->prepare("
+                    SELECT idEndereco FROM enderecos_usuarios 
+                    WHERE idUsuario = ? AND tipoUsuario = ?
+                ");
+                $stmt->execute([$idUsuario, $tipoUsuario]);
+                $enderecoExistente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($enderecoExistente) {
+                    // Atualizar endereço existente
+                    $stmt = $this->db->prepare("
+                        UPDATE enderecos_usuarios 
+                        SET cep = ?, logradouro = ?, numero = ?, complemento = ?, 
+                            bairro = ?, cidade = ?, estado = ?, pais = ?,
+                            data_atualizacao = NOW()
+                        WHERE idEndereco = ?
+                    ");
+                    
+                    $stmt->execute([
+                        $endereco['cep'] ?? '',
+                        $endereco['logradouro'] ?? '',
+                        $endereco['numero'] ?? '',
+                        $endereco['complemento'] ?? '',
+                        $endereco['bairro'] ?? '',
+                        $endereco['cidade'] ?? '',
+                        $endereco['estado'] ?? '',
+                        $endereco['pais'] ?? 'Brasil',
+                        $enderecoExistente['idEndereco']
+                    ]);
+                } else {
+                    // Inserir novo endereço
+                    $stmt = $this->db->prepare("
+                        INSERT INTO enderecos_usuarios 
+                        (idUsuario, tipoUsuario, cep, logradouro, numero, complemento, 
+                        bairro, cidade, estado, pais, data_criacao)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    ");
+                    
+                    $stmt->execute([
+                        $idUsuario,
+                        $tipoUsuario,
+                        $endereco['cep'] ?? '',
+                        $endereco['logradouro'] ?? '',
+                        $endereco['numero'] ?? '',
+                        $endereco['complemento'] ?? '',
+                        $endereco['bairro'] ?? '',
+                        $endereco['cidade'] ?? '',
+                        $endereco['estado'] ?? '',
+                        $endereco['pais'] ?? 'Brasil'
+                    ]);
+                }
+                
+                return true;
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao atualizar endereço: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function atualizarAcademiaUsuario($tipoUsuario, $idUsuario, $idAcademia) {
+            try {
+                $tabela = $tipoUsuario === 'aluno' ? 'alunos' : 'personal';
+                $campoId = $tipoUsuario === 'aluno' ? 'idAluno' : 'idPersonal';
+                
+                $stmt = $this->db->prepare("UPDATE {$tabela} SET idAcademia = ? WHERE {$campoId} = ?");
+                $stmt->execute([$idAcademia, $idUsuario]);
+                
+                return true;
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao atualizar academia: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function atualizarAcademiaEEnviarSolicitacao($tipoUsuario, $idUsuario, $idAcademia, $idAcademiaOriginal = null) {
+            try {
+                $tabela = $tipoUsuario === 'aluno' ? 'alunos' : 'personal';
+                $campoId = $tipoUsuario === 'aluno' ? 'idAluno' : 'idPersonal';
+                
+                // Atualizar academia no usuário
+                $stmt = $this->db->prepare("UPDATE {$tabela} SET idAcademia = ? WHERE {$campoId} = ?");
+                $stmt->execute([$idAcademia, $idUsuario]);
+                
+                // Se a academia mudou, enviar solicitação
+                if ($idAcademia != $idAcademiaOriginal) {
+                    $this->enviarSolicitacaoAcademia($idUsuario, $tipoUsuario, $idAcademia);
+                }
+                
+                return true;
+            } catch (PDOException $e) {
+                error_log("❌ Erro ao atualizar academia: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        private function enviarSolicitacaoAcademia($idUsuario, $tipoUsuario, $idAcademia) {
+            try {
+                // Verificar se academia existe e está ativa
+                $stmt = $this->db->prepare("SELECT idAcademia FROM academias WHERE idAcademia = ? AND status_conta = 'Ativa'");
+                $stmt->execute([$idAcademia]);
+                
+                if (!$stmt->fetch()) {
+                    error_log("⚠️ Academia ID $idAcademia não encontrada ou inativa");
+                    return false;
+                }
+
+                // Gerar token único
+                $token = bin2hex(random_bytes(32));
+
+                // Inserir solicitação
+                $stmt = $this->db->prepare("
+                    INSERT INTO solicitacoes_academia 
+                    (token, idAcademia, idUsuario, tipo_usuario, data_criacao) 
+                    VALUES (?, ?, ?, ?, NOW())
+                ");
+
+                $success = $stmt->execute([
+                    $token,
+                    $idAcademia,
+                    $idUsuario,
+                    $tipoUsuario
+                ]);
+
+                if ($success) {
+                    error_log("✅ Solicitação de vinculação enviada para academia ID: $idAcademia");
+                    return true;
+                } else {
+                    error_log("❌ Erro ao enviar solicitação de vinculação");
+                    return false;
+                }
+            } catch (PDOException $e) {
+                error_log("❌ PDOException ao enviar solicitação: " . $e->getMessage());
+                return false;
             }
         }
     }

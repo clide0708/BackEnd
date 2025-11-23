@@ -585,6 +585,15 @@
             'controller' => 'PerfilController',
             'method' => 'excluirConta'
         ],
+        'perfil/atualizar-completo' => [
+            'controller' => 'PerfilController',
+            'method' => 'atualizarPerfilCompleto'
+        ],
+
+        'academia/solicitacao/status/([^/]+)/(\d+)' => [
+            'controller' => 'AcademiasController',
+            'method' => 'getStatusSolicitacao'
+        ],
 
         // Rotas para Planos
         'planos' => [

@@ -2,7 +2,7 @@
 
     require_once __DIR__ . '/../Config/db.connect.php';
 
-    class AcademiaController
+    class AcademiasController
     {
         private $db;
 
@@ -14,32 +14,46 @@
         /**
          * Painel de controle da academia
          */
-        public function getPainelControle()
-        {
+        public function getPainelControle() {
             header('Content-Type: application/json');
 
             try {
+                error_log("🎯 Iniciando getPainelControle()");
+
                 // Verificar se é academia
                 $academia = $this->getAcademiaFromToken();
                 if (!$academia) {
+                    error_log("❌ Acesso negado - Não é academia ou token inválido");
                     http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas academias podem acessar este painel.']);
+                    echo json_encode([
+                        'success' => false, 
+                        'error' => 'Acesso negado. Apenas academias podem acessar este painel.'
+                    ]);
                     return;
                 }
 
                 $idAcademia = $academia['idAcademia'];
+                
+                error_log("=== PAINEL ACADEMIA ID: {$idAcademia} - NOME: {$academia['nome']} ===");
 
                 // Estatísticas gerais
                 $estatisticas = $this->getEstatisticasAcademia($idAcademia);
-
+                
                 // Solicitações pendentes
                 $solicitacoesPendentes = $this->getSolicitacoesPendentes($idAcademia);
-
+                
                 // Usuários vinculados
                 $usuariosVinculados = $this->getUsuariosVinculados($idAcademia);
 
-                http_response_code(200);
-                echo json_encode([
+                // 🔥 CORREÇÃO: Garantir que sempre retornam arrays
+                $solicitacoesPendentes = $solicitacoesPendentes ?: [];
+                $usuariosVinculados = $usuariosVinculados ?: [];
+
+                error_log("✅ Dados coletados - Estatísticas: " . json_encode($estatisticas) . 
+                        ", Solicitações: " . count($solicitacoesPendentes) . 
+                        ", Usuários: " . count($usuariosVinculados));
+
+                $responseData = [
                     'success' => true,
                     'data' => [
                         'academia' => [
@@ -51,14 +65,27 @@
                         'solicitacoes_pendentes' => $solicitacoesPendentes,
                         'usuarios_vinculados' => $usuariosVinculados
                     ]
-                ]);
+                ];
+
+                error_log("📤 Enviando resposta: " . json_encode(['success' => true]));
+
+                http_response_code(200);
+                echo json_encode($responseData);
 
             } catch (PDOException $e) {
+                error_log("❌ ERRO PDO no painel: " . $e->getMessage());
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Erro no banco: ' . $e->getMessage()]);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => 'Erro no banco de dados: ' . $e->getMessage()
+                ]);
             } catch (Exception $e) {
+                error_log("❌ ERRO GERAL no painel: " . $e->getMessage());
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => 'Erro interno: ' . $e->getMessage()
+                ]);
             }
         }
 
@@ -354,44 +381,64 @@
 
         // ========== MÉTODOS AUXILIARES ==========
 
-        private function getEstatisticasAcademia($idAcademia)
-        {
-            // Alunos vinculados
-            $stmt = $this->db->prepare("
-                SELECT COUNT(*) as total_alunos 
-                FROM usuarios_academia 
-                WHERE idAcademia = ? AND tipo_usuario = 'aluno' AND status = 'ativo'
-            ");
-            $stmt->execute([$idAcademia]);
-            $alunos = $stmt->fetch(PDO::FETCH_ASSOC);
+        private function getEstatisticasAcademia($idAcademia) {
+            try {
+                error_log("🔍 Buscando estatísticas para academia ID: $idAcademia");
+                
+                // Alunos vinculados - USANDO fetchColumn() para simplificar
+                $stmt = $this->db->prepare("
+                    SELECT COUNT(*) as total_alunos 
+                    FROM usuarios_academia 
+                    WHERE idAcademia = ? AND tipo_usuario = 'aluno' AND status = 'ativo'
+                ");
+                $stmt->execute([$idAcademia]);
+                $totalAlunos = (int)$stmt->fetchColumn();
 
-            // Personais vinculados
-            $stmt = $this->db->prepare("
-                SELECT COUNT(*) as total_personais 
-                FROM usuarios_academia 
-                WHERE idAcademia = ? AND tipo_usuario = 'personal' AND status = 'ativo'
-            ");
-            $stmt->execute([$idAcademia]);
-            $personais = $stmt->fetch(PDO::FETCH_ASSOC);
+                // Personais vinculados
+                $stmt = $this->db->prepare("
+                    SELECT COUNT(*) as total_personais 
+                    FROM usuarios_academia 
+                    WHERE idAcademia = ? AND tipo_usuario = 'personal' AND status = 'ativo'
+                ");
+                $stmt->execute([$idAcademia]);
+                $totalPersonais = (int)$stmt->fetchColumn();
 
-            // Solicitações pendentes
-            $stmt = $this->db->prepare("
-                SELECT COUNT(*) as solicitacoes_pendentes 
-                FROM solicitacoes_academia 
-                WHERE idAcademia = ? AND status = 'pendente'
-            ");
-            $stmt->execute([$idAcademia]);
-            $solicitacoes = $stmt->fetch(PDO::FETCH_ASSOC);
+                // Solicitações pendentes
+                $stmt = $this->db->prepare("
+                    SELECT COUNT(*) as solicitacoes_pendentes 
+                    FROM solicitacoes_academia 
+                    WHERE idAcademia = ? AND status = 'pendente'
+                ");
+                $stmt->execute([$idAcademia]);
+                $totalSolicitacoes = (int)$stmt->fetchColumn();
 
-            return [
-                'alunos_vinculados' => (int)$alunos['total_alunos'],
-                'personais_vinculados' => (int)$personais['total_personais'],
-                'solicitacoes_pendentes' => (int)$solicitacoes['solicitacoes_pendentes']
-            ];
+                $estatisticas = [
+                    'alunos_vinculados' => $totalAlunos,
+                    'personais_vinculados' => $totalPersonais,
+                    'solicitacoes_pendentes' => $totalSolicitacoes
+                ];
+
+                error_log("✅ Estatísticas processadas: " . json_encode($estatisticas));
+                return $estatisticas;
+
+            } catch (PDOException $e) {
+                error_log("❌ ERRO PDO em getEstatisticasAcademia: " . $e->getMessage());
+                return [
+                    'alunos_vinculados' => 0,
+                    'personais_vinculados' => 0,
+                    'solicitacoes_pendentes' => 0
+                ];
+            } catch (Exception $e) {
+                error_log("❌ ERRO GERAL em getEstatisticasAcademia: " . $e->getMessage());
+                return [
+                    'alunos_vinculados' => 0,
+                    'personais_vinculados' => 0,
+                    'solicitacoes_pendentes' => 0
+                ];
+            }
         }
 
-        private function getSolicitacoesPendentes($idAcademia)
-        {
+        private function getSolicitacoesPendentes($idAcademia) {
             $stmt = $this->db->prepare("
                 SELECT 
                     s.idSolicitacao,
@@ -415,11 +462,10 @@
                 ORDER BY s.data_criacao DESC
             ");
             $stmt->execute([$idAcademia]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC); // 🔥 Garantir array associativo
         }
 
-        private function getUsuariosVinculados($idAcademia)
-        {
+        private function getUsuariosVinculados($idAcademia) {
             $stmt = $this->db->prepare("
                 SELECT 
                     u.idVinculo,
@@ -446,7 +492,7 @@
                 ORDER BY u.data_vinculo DESC
             ");
             $stmt->execute([$idAcademia]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC); // 🔥 Garantir array associativo
         }
 
         private function verificarAcademiaAtiva($idAcademia)
@@ -510,33 +556,55 @@
             return $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        private function getAcademiaFromToken()
-        {
-            $headers = getallheaders();
-            $authHeader = $headers['Authorization'] ?? '';
-            
-            if (strpos($authHeader, 'Bearer ') === 0) {
-                require_once __DIR__ . '/../Config/jwt.config.php';
-                $token = str_replace('Bearer ', '', $authHeader);
+        private function getAcademiaFromToken() {
+            try {
+                $headers = getallheaders();
+                $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
                 
-                try {
-                    $decoded = decodificarToken($token);
-                    if ($decoded && $decoded['tipo'] === 'academia') {
-                        // Buscar dados completos da academia
-                        $stmt = $this->db->prepare("
-                            SELECT idAcademia, nome, email, status_conta 
-                            FROM academias 
-                            WHERE idAcademia = ? AND status_conta = 'Ativa'
-                        ");
-                        $stmt->execute([$decoded['sub']]);
-                        return $stmt->fetch(PDO::FETCH_ASSOC);
+                error_log("🔐 Verificando token - Header: " . $authHeader);
+
+                if (strpos($authHeader, 'Bearer ') === 0) {
+                    require_once __DIR__ . '/../Config/jwt.config.php';
+                    $token = str_replace('Bearer ', '', $authHeader);
+                    
+                    try {
+                        $decoded = decodificarToken($token);
+                        error_log("🔓 Token decodificado: " . json_encode($decoded));
+                        
+                        if ($decoded && isset($decoded->tipo) && $decoded->tipo === 'academia') { // 🔥 CORREÇÃO: usar -> em vez de ['']
+                            // Buscar dados completos da academia
+                            $stmt = $this->db->prepare("
+                                SELECT idAcademia, nome, email, status_conta 
+                                FROM academias 
+                                WHERE idAcademia = ? AND status_conta = 'Ativa'
+                            ");
+                            $stmt->execute([$decoded->sub]); // 🔥 CORREÇÃO: usar -> em vez de ['']
+                            $academia = $stmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($academia && isset($academia['idAcademia'])) {
+                                error_log("✅ Academia encontrada: " . $academia['nome']);
+                                return $academia;
+                            } else {
+                                error_log("❌ Academia não encontrada ou inativa para ID: " . $decoded->sub); // 🔥 CORREÇÃO
+                                return null;
+                            }
+                        } else {
+                            error_log("❌ Token não é de academia ou tipo inválido");
+                            return null;
+                        }
+                    } catch (Exception $e) {
+                        error_log("❌ Erro ao decodificar token: " . $e->getMessage());
+                        return null;
                     }
-                } catch (Exception $e) {
+                } else {
+                    error_log("❌ Header de autorização não encontrado ou formato inválido");
                     return null;
                 }
+                
+            } catch (Exception $e) {
+                error_log("❌ Erro geral em getAcademiaFromToken: " . $e->getMessage());
+                return null;
             }
-            
-            return null;
         }
 
         private function verificarAcademiaLogada()
@@ -557,6 +625,50 @@
             }
             
             return false;
+        }
+
+        // AcademiasController.php - Adicione este método temporário para debug
+        private function debugAcademia($idAcademia) {
+            error_log("=== DEBUG ACADEMIA ID: $idAcademia ===");
+            
+            // Verificar academia
+            $stmt = $this->db->prepare("SELECT * FROM academias WHERE idAcademia = ?");
+            $stmt->execute([$idAcademia]);
+            $academia = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log("Academia: " . print_r($academia, true));
+            
+            // Verificar usuários vinculados
+            $stmt = $this->db->prepare("SELECT * FROM usuarios_academia WHERE idAcademia = ?");
+            $stmt->execute([$idAcademia]);
+            $vinculos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("Vinculos: " . print_r($vinculos, true));
+            
+            // Verificar solicitações
+            $stmt = $this->db->prepare("SELECT * FROM solicitacoes_academia WHERE idAcademia = ?");
+            $stmt->execute([$idAcademia]);
+            $solicitacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("Solicitações: " . print_r($solicitacoes, true));
+        }
+
+        private function debugEstatisticas($idAcademia) {
+            error_log("=== DEBUG ESTATÍSTICAS PARA ACADEMIA ID: $idAcademia ===");
+            
+            // Testar cada consulta individualmente
+            $stmt = $this->db->prepare("SELECT COUNT(*) as total_alunos FROM usuarios_academia WHERE idAcademia = ? AND tipo_usuario = 'aluno' AND status = 'ativo'");
+            $stmt->execute([$idAcademia]);
+            $alunos = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log("Alunos: " . print_r($alunos, true));
+            error_log("Tipo de alunos: " . gettype($alunos));
+            
+            $stmt = $this->db->prepare("SELECT COUNT(*) as total_personais FROM usuarios_academia WHERE idAcademia = ? AND tipo_usuario = 'personal' AND status = 'ativo'");
+            $stmt->execute([$idAcademia]);
+            $personais = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log("Personais: " . print_r($personais, true));
+            
+            $stmt = $this->db->prepare("SELECT COUNT(*) as solicitacoes_pendentes FROM solicitacoes_academia WHERE idAcademia = ? AND status = 'pendente'");
+            $stmt->execute([$idAcademia]);
+            $solicitacoes = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log("Solicitações: " . print_r($solicitacoes, true));
         }
     }
 

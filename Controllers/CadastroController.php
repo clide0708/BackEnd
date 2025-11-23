@@ -94,6 +94,11 @@
                     $alunoId = $this->db->lastInsertId();
                     $aluno = $this->buscarAlunoPorId($alunoId);
 
+                    
+                    if (isset($data['idAcademia']) && !empty($data['idAcademia'])) {
+                        $this->enviarSolicitacaoVinculacaoAcademia($alunoId, 'aluno', $data['idAcademia']);
+                    }
+
                     // Inserir endereço do aluno
                     if (isset($data['cep']) && !empty($data['cep'])) {
                         $errosEndereco = $this->validarDadosEndereco($data);
@@ -257,6 +262,11 @@
 
                 if ($success) {
                     $personalId = $this->db->lastInsertId();
+                    
+                    if (isset($data['idAcademia']) && !empty($data['idAcademia'])) {
+                        $this->enviarSolicitacaoVinculacaoAcademia($personalId, 'personal', $data['idAcademia']);
+                    }
+                    
                     // Criar assinatura para o plano básico
                     $this->criarAssinatura($personalId, 'personal', $idPlanoBasico, 'ativa');
 
@@ -745,6 +755,11 @@
                 $stmt->execute();
                 $academias = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+                // 🔥 CORREÇÃO: Log para verificar as URLs das fotos
+                foreach ($academias as $academia) {
+                    error_log("📸 Academia: {$academia['nome']} - Foto URL: {$academia['foto_url']}");
+                }
+
                 error_log("✅ Academias encontradas: " . count($academias));
                 
                 http_response_code(200);
@@ -896,6 +911,35 @@
             }
         }
 
+        public function verificarArquivo($data) {
+            try {
+                $nomeArquivo = $data['nome_arquivo'] ?? '';
+                
+                if (!$nomeArquivo) {
+                    echo json_encode(['success' => false, 'error' => 'Nome do arquivo não fornecido']);
+                    return;
+                }
+                
+                $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
+                $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+                
+                $existe = file_exists($caminhoCompleto);
+                $tamanho = $existe ? filesize($caminhoCompleto) : 0;
+                $acessivel = $existe ? is_readable($caminhoCompleto) : false;
+                
+                echo json_encode([
+                    'success' => true,
+                    'existe' => $existe,
+                    'tamanho' => $tamanho,
+                    'acessivel' => $acessivel,
+                    'caminho' => $caminhoCompleto
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+        }
+
         public function completarCadastroAcademia($data) {
             try {
                 $idAcademia = $data['idAcademia'] ?? null;
@@ -969,7 +1013,6 @@
                 // 🔥 CORREÇÃO: Verificar se é FormData ou JSON
                 $dados = $data;
                 if (empty($data) && isset($_POST) && !empty($_POST)) {
-                    // Se veio como FormData, usar $_POST
                     $dados = $_POST;
                     
                     // Processar modalidades do FormData
@@ -985,8 +1028,8 @@
                     return;
                 }
 
-                // Validar dados do perfil
-                $erros = $this->validarDadosPerfil($dados);
+                // 🔥 VALIDAÇÃO EXPANDIDA: Incluir peso e treinoTipo
+                $erros = $this->validarDadosPerfilAluno($dados);
                 if (!empty($erros)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => implode(', ', $erros)]);
@@ -996,11 +1039,11 @@
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
                 $fotoUrl = $data['foto_url'] ?? null;
 
-                // Atualizar dados principais
+                // 🔥 ATUALIZAÇÃO EXPANDIDA: Incluir peso e treinoTipo
                 $stmt = $this->db->prepare("
                     UPDATE alunos 
-                    SET data_nascimento = ?, genero = ?, altura = ?, meta = ?, 
-                        treinoTipo = ?, treinos_adaptados = ?, foto_url = ?, cadastro_completo = 1
+                    SET data_nascimento = ?, genero = ?, altura = ?, peso = ?, 
+                        meta = ?, treinoTipo = ?, treinos_adaptados = ?, foto_url = ?, cadastro_completo = 1
                     WHERE idAluno = ?
                 ");
 
@@ -1008,10 +1051,11 @@
                     $dados['data_nascimento'] ?? null,
                     $dados['genero'] ?? null,
                     $dados['altura'] ?? null,
+                    $dados['peso'] ?? null, // 🔥 NOVO CAMPO
                     $dados['meta'] ?? null,
-                    $dados['treinoTipo'] ?? null,
+                    $dados['treinoTipo'] ?? null, // 🔥 NOVO CAMPO
                     $dados['treinos_adaptados'] ?? 0,
-                    $fotoUrl, // 🔥 CORREÇÃO: Usar a foto_url
+                    $fotoUrl,
                     $idAluno
                 ]);
 
@@ -1261,65 +1305,99 @@
             }
         }
         
-        // public function uploadESalvarFotoPerfil($data) {
-        //     try {
-        //         // Verificar se há arquivo enviado
-        //         if (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
-        //             return ['success' => false, 'error' => 'Nenhum arquivo enviado ou erro no upload'];
-        //         }
-
-        //         $arquivo = $_FILES['foto'];
+        private function enviarSolicitacaoVinculacaoAcademia($idUsuario, $tipoUsuario, $idAcademia) {
+            try {
+                // Verificar se academia existe e está ativa
+                $stmt = $this->db->prepare("SELECT idAcademia FROM academias WHERE idAcademia = ? AND status_conta = 'Ativa'");
+                $stmt->execute([$idAcademia]);
                 
-        //         // Validar tipo de arquivo
-        //         $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        //         if (!in_array($arquivo['type'], $tiposPermitidos)) {
-        //             return ['success' => false, 'error' => 'Tipo de arquivo não permitido'];
-        //         }
+                if (!$stmt->fetch()) {
+                    error_log("⚠️ Academia ID $idAcademia não encontrada ou inativa");
+                    return false;
+                }
 
-        //         // Validar tamanho (máximo 5MB)
-        //         if ($arquivo['size'] > 5 * 1024 * 1024) {
-        //             return ['success' => false, 'error' => 'Arquivo muito grande. Máximo: 5MB'];
-        //         }
+                // Gerar token único
+                $token = bin2hex(random_bytes(32));
 
-        //         // 🔥 CORREÇÃO: Caminho correto
-        //         $diretorioDestino = __DIR__ . '/../assets/images/uploads/';
-        //         if (!is_dir($diretorioDestino)) {
-        //             mkdir($diretorioDestino, 0755, true);
-        //         }
+                // Inserir solicitação
+                $stmt = $this->db->prepare("
+                    INSERT INTO solicitacoes_academia 
+                    (token, idAcademia, idUsuario, tipo_usuario, data_criacao) 
+                    VALUES (?, ?, ?, ?, NOW())
+                ");
 
-        //         // Gerar nome único para o arquivo
-        //         $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
-        //         $nomeArquivo = 'perfil_' . time() . '_' . uniqid() . '.' . $extensao;
-        //         $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+                $success = $stmt->execute([
+                    $token,
+                    $idAcademia,
+                    $idUsuario,
+                    $tipoUsuario
+                ]);
 
-        //         // Mover arquivo para o diretório de destino
-        //         if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
-        //             // Verificar se o arquivo realmente existe
-        //             if (!file_exists($caminhoCompleto)) {
-        //                 return ['success' => false, 'error' => 'Arquivo não foi salvo no servidor'];
-        //             }
-                    
-        //             // URL relativa para acesso via frontend
-        //             $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
-                    
-        //             error_log("✅ Foto salva em: " . $caminhoCompleto);
-        //             error_log("✅ URL relativa: " . $urlRelativa);
-                    
-        //             return [
-        //                 'success' => true,
-        //                 'url' => $urlRelativa,
-        //                 'nome_arquivo' => $nomeArquivo,
-        //                 'message' => 'Foto uploadada com sucesso'
-        //             ];
-        //         } else {
-        //             error_log("❌ Falha ao mover arquivo para: " . $caminhoCompleto);
-        //             return ['success' => false, 'error' => 'Erro ao salvar arquivo no servidor'];
-        //         }
+                if ($success) {
+                    error_log("✅ Solicitação de vinculação enviada para academia ID: $idAcademia");
+                    return true;
+                } else {
+                    error_log("❌ Erro ao enviar solicitação de vinculação");
+                    return false;
+                }
+            } catch (PDOException $e) {
+                error_log("❌ PDOException ao enviar solicitação: " . $e->getMessage());
+                return false;
+            }
+        }
 
-        //     } catch (Exception $e) {
-        //         error_log("❌ Exception: " . $e->getMessage());
-        //         return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()];
-        //     }
-        // }
+        private function validarDadosPerfilAluno($data) {
+            $erros = [];
+
+            // Validações básicas
+            if (empty($data['data_nascimento'])) {
+                $erros[] = 'Data de nascimento é obrigatória';
+            } else {
+                $dataNasc = DateTime::createFromFormat('Y-m-d', $data['data_nascimento']);
+                $hoje = new DateTime();
+                
+                if (!$dataNasc || $dataNasc > $hoje) {
+                    $erros[] = 'Data de nascimento inválida';
+                } else {
+                    $idade = $hoje->diff($dataNasc)->y;
+                    if ($idade < 12 || $idade > 120) {
+                        $erros[] = 'Idade deve estar entre 12 e 120 anos';
+                    }
+                }
+            }
+
+            if (empty($data['genero'])) {
+                $erros[] = 'Gênero é obrigatório';
+            } else if (!in_array($data['genero'], ['Masculino', 'Feminino', 'Outro'])) {
+                $erros[] = 'Gênero inválido';
+            }
+
+            // 🔥 NOVAS VALIDAÇÕES: Peso e Altura
+            if (empty($data['altura'])) {
+                $erros[] = 'Altura é obrigatória';
+            } else if ($data['altura'] < 100 || $data['altura'] > 250) {
+                $erros[] = 'Altura deve estar entre 100cm e 250cm';
+            }
+
+            if (empty($data['peso'])) {
+                $erros[] = 'Peso é obrigatório';
+            } else if ($data['peso'] < 30 || $data['peso'] > 300) {
+                $erros[] = 'Peso deve estar entre 30kg e 300kg';
+            }
+
+            // 🔥 NOVA VALIDAÇÃO: Tipo de Treino
+            if (empty($data['treinoTipo'])) {
+                $erros[] = 'Nível de atividade é obrigatório';
+            } else if (!in_array($data['treinoTipo'], ['Sedentário', 'Leve', 'Moderado', 'Intenso'])) {
+                $erros[] = 'Nível de atividade inválido';
+            }
+
+            // Validação de modalidades
+            if (empty($data['modalidades']) || !is_array($data['modalidades']) || count($data['modalidades']) === 0) {
+                $erros[] = 'Selecione pelo menos uma modalidade';
+            }
+
+            return $erros;
+        }
 
     }
