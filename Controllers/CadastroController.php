@@ -724,6 +724,7 @@
             error_log("🎯 listarAcademiasAtivas() chamada");
             
             try {
+                // 🔥 CORREÇÃO: Query sem GROUP BY problemático
                 $stmt = $this->db->prepare("
                     SELECT 
                         a.idAcademia,
@@ -742,18 +743,27 @@
                             CASE WHEN eu.bairro IS NOT NULL THEN CONCAT(' - ', eu.bairro) ELSE '' END,
                             CASE WHEN eu.cidade IS NOT NULL THEN CONCAT(', ', eu.cidade) ELSE '' END,
                             CASE WHEN eu.estado IS NOT NULL THEN CONCAT(' - ', eu.estado) ELSE '' END
-                        ) as endereco_completo,
-                        GROUP_CONCAT(DISTINCT m.nome SEPARATOR ', ') as modalidades
+                        ) as endereco_completo
                     FROM academias a
                     LEFT JOIN enderecos_usuarios eu ON a.idAcademia = eu.idUsuario AND eu.tipoUsuario = 'academia'
-                    LEFT JOIN modalidades_academia ma ON a.idAcademia = ma.idAcademia
-                    LEFT JOIN modalidades m ON ma.idModalidade = m.idModalidade
                     WHERE a.status_conta = 'Ativa'
-                    GROUP BY a.idAcademia
                     ORDER BY a.nome
                 ");
                 $stmt->execute();
                 $academias = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // 🔥 CORREÇÃO: Buscar modalidades separadamente
+                foreach ($academias as &$academia) {
+                    $stmtModalidades = $this->db->prepare("
+                        SELECT GROUP_CONCAT(m.nome SEPARATOR ', ') as modalidades
+                        FROM modalidades_academia ma
+                        JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                        WHERE ma.idAcademia = ?
+                    ");
+                    $stmtModalidades->execute([$academia['idAcademia']]);
+                    $modalidades = $stmtModalidades->fetch(PDO::FETCH_ASSOC);
+                    $academia['modalidades'] = $modalidades['modalidades'] ?? '';
+                }
 
                 // 🔥 CORREÇÃO: Log para verificar as URLs das fotos
                 foreach ($academias as $academia) {
