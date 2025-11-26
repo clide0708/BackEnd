@@ -970,6 +970,11 @@
 
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
                 $fotoUrl = $data['foto_url'] ?? null;
+        
+                // Se a foto_url é relativa, converter para absoluta
+                if ($fotoUrl && !str_starts_with($fotoUrl, 'http')) {
+                    $fotoUrl = $this->getBaseUrl() . '/' . ltrim($fotoUrl, '/');
+                }
 
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
@@ -1060,8 +1065,12 @@
 
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
                 $fotoUrl = $data['foto_url'] ?? null;
+        
+                // Se a foto_url é relativa, converter para absoluta
+                if ($fotoUrl && !str_starts_with($fotoUrl, 'http')) {
+                    $fotoUrl = $this->getBaseUrl() . '/' . ltrim($fotoUrl, '/');
+                }
 
-                // 🔥 ATUALIZAÇÃO EXPANDIDA: Incluir peso e treinoTipo
                 $stmt = $this->db->prepare("
                     UPDATE alunos 
                     SET data_nascimento = ?, genero = ?, altura = ?, peso = ?, 
@@ -1073,11 +1082,11 @@
                     $dados['data_nascimento'] ?? null,
                     $dados['genero'] ?? null,
                     $dados['altura'] ?? null,
-                    $dados['peso'] ?? null, // 🔥 NOVO CAMPO
+                    $dados['peso'] ?? null,
                     $dados['meta'] ?? null,
-                    $dados['treinoTipo'] ?? null, // 🔥 NOVO CAMPO
+                    $dados['treinoTipo'] ?? null,
                     $dados['treinos_adaptados'] ?? 0,
-                    $fotoUrl,
+                    $fotoUrl, // 🔥 Agora com URL absoluta
                     $idAluno
                 ]);
 
@@ -1124,6 +1133,11 @@
 
                 // 🔥 PROCESSAR FOTO: Se já veio com URL do upload anterior, usar ela
                 $fotoUrl = $data['foto_url'] ?? null;
+        
+                // Se a foto_url é relativa, converter para absoluta
+                if ($fotoUrl && !str_starts_with($fotoUrl, 'http')) {
+                    $fotoUrl = $this->getBaseUrl() . '/' . ltrim($fotoUrl, '/');
+                }
 
                 // Atualizar dados principais
                 $stmt = $this->db->prepare("
@@ -1447,6 +1461,18 @@
             // TODO: Implementar integração com API dos CREFs
             // Por enquanto, retorna true para testes
             return true;
+        }
+
+        private function getBaseUrl() {
+            // 🔥 CORREÇÃO: URL fixa para produção
+            if (isset($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], 'clidefit.com.br') !== false) {
+                return 'https://api.clidefit.com.br';
+            }
+            
+            // Para desenvolvimento
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            return "{$protocol}://{$host}";
         }
 
     }

@@ -10,14 +10,22 @@
         }
 
         private function getBaseUrl() {
-            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-            $host = $_SERVER['HTTP_HOST'];
+            // 🔥 CORREÇÃO: Usar URL fixa da API em produção
+            if (isset($_SERVER['HTTP_HOST'])) {
+                $host = $_SERVER['HTTP_HOST'];
+                
+                // Se estiver em produção, usar URL fixa
+                if (strpos($host, 'clidefit.com.br') !== false) {
+                    return 'https://api.clidefit.com.br';
+                }
+                
+                // Para desenvolvimento local
+                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+                return "{$protocol}://{$host}";
+            }
             
-            // Remove /api se estiver na URL
-            $basePath = str_replace('/api', '', $_SERVER['REQUEST_URI'] ?? '');
-            $basePath = dirname($basePath);
-            
-            return "{$protocol}://{$host}{$basePath}";
+            // Fallback para produção
+            return 'https://api.clidefit.com.br';
         }
 
         public function uploadFotoPerfil($data = null) {
@@ -66,12 +74,15 @@
 
                 // Mover arquivo para o diretório de destino
                 if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
-                    // URL relativa para compatibilidade
-                    $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
+                    // 🔥 CORREÇÃO: URL relativa consistente
+                    $urlRelativa = 'assets/images/uploads/' . $nomeArquivo;
                     
-                    // URL completa dinâmica
-                    $baseUrl = $this->getBaseUrl(); // Implemente esta função
-                    $urlCompleta = $baseUrl . 'assets/images/uploads/' . $nomeArquivo;
+                    // 🔥 CORREÇÃO: URL completa usando base fixa
+                    $baseUrl = $this->getBaseUrl();
+                    $urlCompleta = $baseUrl . '/' . $urlRelativa;
+                    
+                    // 🔥 CORREÇÃO: Log para debug
+                    error_log("📸 URL da foto gerada: " . $urlCompleta);
                     
                     http_response_code(200);
                     echo json_encode([

@@ -1078,8 +1078,15 @@
 
                 // Adicionar foto_url se existir
                 if (isset($data['foto_url'])) {
+                    $fotoUrl = $data['foto_url'];
+                    
+                    // Se a URL é relativa, converter para absoluta
+                    if ($fotoUrl && !str_starts_with($fotoUrl, 'http')) {
+                        $fotoUrl = $this->getBaseUrl() . '/' . ltrim($fotoUrl, '/');
+                    }
+                    
                     $camposAtualizacao[] = "foto_url = ?";
-                    $valores[] = $data['foto_url'];
+                    $valores[] = $fotoUrl;
                 }
 
                 // Atualizar dados principais
