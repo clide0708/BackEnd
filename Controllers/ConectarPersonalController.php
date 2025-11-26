@@ -36,7 +36,7 @@
 
                 // Query base CORRIGIDA
                 $sql = "
-                    SELECT DISTINCT
+                     SELECT DISTINCT
                         p.idPersonal,
                         p.nome,
                         p.foto_url as foto_perfil,
@@ -53,7 +53,8 @@
                         e.longitude,
                         ac.nome as nome_academia,
                         ac.idAcademia,
-                        (SELECT COUNT(*) FROM treinos t WHERE t.idPersonal = p.idPersonal) as treinos_count
+                        (SELECT COUNT(*) FROM treinos t WHERE t.idPersonal = p.idPersonal) as treinos_count,
+                        p.data_cadastro
                     FROM personal p
                     LEFT JOIN enderecos_usuarios e ON p.idPersonal = e.idUsuario AND e.tipoUsuario = 'personal'
                     LEFT JOIN academias ac ON p.idAcademia = ac.idAcademia
@@ -196,7 +197,8 @@
                         e.latitude,
                         e.longitude,
                         ac.nome as nome_academia,
-                        ac.idAcademia
+                        ac.idAcademia,
+                        a.data_cadastro
                     FROM alunos a
                     LEFT JOIN enderecos_usuarios e ON a.idAluno = e.idUsuario AND e.tipoUsuario = 'aluno'
                     LEFT JOIN academias ac ON a.idAcademia = ac.idAcademia
