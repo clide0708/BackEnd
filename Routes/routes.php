@@ -590,7 +590,7 @@
             'controller' => 'PerfilController',
             'method' => 'putPerfilDev'
         ],
-       'perfil/personal/(\d+)/alunos' => [
+        'perfil/personal/(\d+)/alunos' => [
             'controller' => 'PerfilController',
             'method' => 'getAlunosDoPersonal'
         ],
