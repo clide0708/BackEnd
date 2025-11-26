@@ -1408,4 +1408,35 @@
             return $erros;
         }
 
+        private function validarCREFCompleto($crefNumero, $categoria, $regional) {
+            // Validar formato do número (6-9 dígitos)
+            if (!preg_match('/^\d{6,9}$/', $crefNumero)) {
+                return false;
+            }
+            
+            // Validar categoria (uma letra)
+            if (!preg_match('/^[A-Z]$/', $categoria)) {
+                return false;
+            }
+            
+            // Validar regional (2 letras - sigla do estado)
+            $regionaisValidas = [
+                'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO',
+                'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI',
+                'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+            ];
+            
+            if (!in_array($regional, $regionaisValidas)) {
+                return false;
+            }
+            
+            return true;
+        }
+
+        private function verificarSituacaoCREF($crefCompleto) {
+            // TODO: Implementar integração com API dos CREFs
+            // Por enquanto, retorna true para testes
+            return true;
+        }
+
     }

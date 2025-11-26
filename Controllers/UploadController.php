@@ -279,6 +279,71 @@
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
             }
         }
+
+        public function uploadDocumentoCREF($data = null) {
+            try {
+                if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                    http_response_code(405);
+                    echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+                    return;
+                }
+
+                if (!isset($_FILES['cref_documento']) || $_FILES['cref_documento']['error'] !== UPLOAD_ERR_OK) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Nenhum documento enviado']);
+                    return;
+                }
+
+                $arquivo = $_FILES['cref_documento'];
+                $crefNumero = $_POST['cref_numero'] ?? 'unknown';
+                
+                // Validar tipos
+                $tiposPermitidos = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+                if (!in_array($arquivo['type'], $tiposPermitidos)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Tipo de documento não permitido']);
+                    return;
+                }
+
+                // Validar tamanho
+                if ($arquivo['size'] > 5 * 1024 * 1024) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Documento muito grande. Máximo: 5MB']);
+                    return;
+                }
+
+                // Criar diretório específico para documentos CREF
+                $diretorioDestino = __DIR__ . '/../assets/documents/cref/';
+                if (!is_dir($diretorioDestino)) {
+                    mkdir($diretorioDestino, 0755, true);
+                }
+
+                // Gerar nome único
+                $extensao = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
+                $nomeArquivo = 'cref_' . $crefNumero . '_' . time() . '.' . $extensao;
+                $caminhoCompleto = $diretorioDestino . $nomeArquivo;
+
+                if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
+                    $urlRelativa = '/assets/documents/cref/' . $nomeArquivo;
+                    
+                    http_response_code(200);
+                    echo json_encode([
+                        'success' => true,
+                        'url' => $urlRelativa,
+                        'nome_arquivo' => $nomeArquivo,
+                        'message' => 'Documento CREF enviado para análise'
+                    ]);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(['success' => false, 'error' => 'Erro ao salvar documento']);
+                }
+
+            } catch (Exception $e) {
+                error_log("Erro upload documento CREF: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+        }
     }
 
 ?>

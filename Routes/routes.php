@@ -88,6 +88,15 @@
             'controller' => 'UploadController',
             'method' => 'deletarFotoPerfil'
         ],
+        // Rota para verificar arquivo enviado
+        'upload/verificar-arquivo' => [
+            'controller' => 'UploadController',
+            'method' => 'verificarArquivo'
+        ],
+        'upload/cref-documento' => [
+            'controller' => 'UploadController',
+            'method' => 'uploadDocumentoCREF'
+        ],
 
         // Rotas para Autenticação
         'auth/login' => [
@@ -694,11 +703,6 @@
             'method' => 'atualizarEndereco'
         ],
 
-        // Rota para verificar arquivo enviado
-        'upload/verificar-arquivo' => [
-            'controller' => 'UploadController',
-            'method' => 'verificarArquivo'
-],
     ];
 
     // Mapeamento de controladores - ADICIONAR VideosController
@@ -781,6 +785,7 @@
         'endereco/([^/]+)',
         'endereco/atualizar',
         'upload/verificar-arquivo',
+        'upload/cref-documento',
     ];
 
     // Função para despachar a requisição
@@ -859,6 +864,8 @@
             'academia/desvincular',
             'endereco/([^/]+)',
             'endereco/atualizar',
+            'upload/verificar-arquivo',
+            'upload/cref-documento',
         ];
 
         // Se a rota não for pública, exige autenticação
