@@ -590,12 +590,16 @@
             'controller' => 'PerfilController',
             'method' => 'putPerfilDev'
         ],
-        'perfil/personal/(\d+)/alunos' => [
+       'perfil/personal/(\d+)/alunos' => [
             'controller' => 'PerfilController',
             'method' => 'getAlunosDoPersonal'
         ],
+        'personal/(\d+)/alunos' => [
+            'controller' => 'PerfilController', 
+            'method' => 'getAlunosDoPersonal'
+        ],
         'perfil/personal/(\d+)/treinos-criados' => [
-            'controller' => 'PerfilController',
+            'controller' => 'PerfilController', 
             'method' => 'getTreinosCriadosPorPersonal'
         ],
         'perfil/plano' => [
@@ -778,6 +782,9 @@
         'perfil/aluno',
         'perfil/personal',
         'perfil/academia',
+        'perfil/personal/(\d+)/alunos',
+        'personal/(\d+)/alunos',
+        'treinos/personal/(\d+)/aluno/(\d+)',
         'planos',
         'planos/(\d+)',
         'exercicios/buscarTodos',
@@ -860,6 +867,9 @@
             'perfil/aluno',
             'perfil/personal',
             'perfil/academia',
+            'perfil/personal/(\d+)/alunos',
+            'personal/(\d+)/alunos',
+            'treinos/personal/(\d+)/aluno/(\d+)',
             'planos',
             'planos/(\d+)',
             'academias-ativas',

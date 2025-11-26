@@ -614,30 +614,132 @@
             }
         }
 
-        // Métodos para listar alunos de um personal
-        public function getAlunosDoPersonal($idPersonal)
+        private function getUsuarioFromToken()
         {
+            $headers = getallheaders();
+            $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+            
+            error_log("🔐 Authorization Header: " . $authHeader);
+
+            if (strpos($authHeader, 'Bearer ') === 0) {
+                require_once __DIR__ . '/../Config/jwt.config.php';
+                $token = str_replace('Bearer ', '', $authHeader);
+                
+                try {
+                    $decoded = decodificarToken($token);
+                    error_log("✅ Token decodificado: " . json_encode($decoded));
+                    
+                    return [
+                        'id' => $decoded->sub,
+                        'tipo' => $decoded->tipo,
+                        'email' => $decoded->email
+                    ];
+                } catch (Exception $e) {
+                    error_log("❌ Erro ao decodificar token: " . $e->getMessage());
+                    return null;
+                }
+            }
+            
+            error_log("❌ Token não encontrado no header");
+            return null;
+        }
+
+        // Métodos para listar alunos de um personal
+        public function getAlunosDoPersonal($idPersonal) {
             header('Content-Type: application/json');
-            if (!$this->idUsuarioLogado || ($this->tipoUsuarioLogado !== 'personal' && $this->tipoUsuarioLogado !== 'dev' && $this->tipoUsuarioLogado !== 'academia')) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'Acesso negado. Usuário não autenticado ou sem permissão.']);
-                return;
-            }
+            
+            try {
+                error_log("🎯 Buscando alunos do personal ID: " . $idPersonal);
+                
+                // Verificar autenticação via token
+                $usuario = $this->getUsuarioFromToken();
+                if (!$usuario) {
+                    http_response_code(401);
+                    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+                    return;
+                }
 
-            // Um personal só pode ver seus próprios alunos
-            if ($this->tipoUsuarioLogado === 'personal' && $this->idUsuarioLogado != $idPersonal) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'Acesso negado. Você só pode ver seus próprios alunos.']);
-                return;
-            }
+                error_log("👤 Usuário autenticado: " . json_encode($usuario));
 
-            $alunos = $this->perfilService->getAlunosDoPersonal($idPersonal);
-            if ($alunos) {
+                // Verificar permissões
+                if ($usuario['tipo'] !== 'personal' && $usuario['tipo'] !== 'dev') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas personais podem ver seus alunos.']);
+                    return;
+                }
+
+                // Personal só pode ver seus próprios alunos
+                if ($usuario['tipo'] === 'personal' && $usuario['id'] != $idPersonal) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Você só pode ver seus próprios alunos.']);
+                    return;
+                }
+
+                // Verificar se o personal existe
+                $stmtCheck = $this->db->prepare("SELECT idPersonal FROM personal WHERE idPersonal = ? AND status_conta = 'Ativa'");
+                $stmtCheck->execute([$idPersonal]);
+                $personalExiste = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+                if (!$personalExiste) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'Personal não encontrado']);
+                    return;
+                }
+
+                // Buscar alunos do personal
+                $stmt = $this->db->prepare("
+                    SELECT 
+                        a.idAluno,
+                        a.nome,
+                        a.email,
+                        a.foto_perfil,
+                        a.data_nascimento,
+                        a.genero,
+                        a.altura,
+                        a.peso,
+                        a.meta,
+                        a.treinos_adaptados,
+                        a.status_vinculo,
+                        ac.nome as academia_nome
+                    FROM alunos a
+                    LEFT JOIN academias ac ON a.idAcademia = ac.idAcademia
+                    WHERE a.idPersonal = ? AND a.status_conta = 'Ativa'
+                    ORDER BY a.nome
+                ");
+                
+                $stmt->execute([$idPersonal]);
+                $alunos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                error_log("📊 Alunos encontrados: " . count($alunos));
+
+                // Buscar modalidades de cada aluno
+                foreach ($alunos as &$aluno) {
+                    $stmtModalidades = $this->db->prepare("
+                        SELECT m.idModalidade, m.nome 
+                        FROM modalidades_aluno ma
+                        JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                        WHERE ma.idAluno = ?
+                    ");
+                    $stmtModalidades->execute([$aluno['idAluno']]);
+                    $modalidades = $stmtModalidades->fetchAll(PDO::FETCH_ASSOC);
+                    $aluno['modalidades'] = $modalidades;
+                }
+
                 http_response_code(200);
-                echo json_encode(['success' => true, 'data' => $alunos]);
-            } else {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Nenhum aluno encontrado para este personal ou acesso negado.']);
+                echo json_encode([
+                    'success' => true,
+                    'data' => $alunos,
+                    'total' => count($alunos)
+                ]);
+
+            } catch (PDOException $e) {
+                error_log("❌ Erro PDO ao buscar alunos do personal: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro no banco de dados: ' . $e->getMessage()]);
+            } catch (Exception $e) {
+                error_log("❌ Erro geral ao buscar alunos do personal: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
         }
 
