@@ -723,6 +723,10 @@
                     $stmtModalidades->execute([$aluno['idAluno']]);
                     $modalidades = $stmtModalidades->fetchAll(PDO::FETCH_ASSOC);
                     $aluno['modalidades'] = $modalidades;
+
+                    if (!empty($aluno['foto_perfil'])) {
+                        $aluno['foto_perfil'] = $this->buildImageUrl($aluno['foto_perfil']);
+                    }
                 }
 
                 http_response_code(200);
@@ -1316,5 +1320,24 @@
                 error_log("❌ PDOException ao enviar solicitação: " . $e->getMessage());
                 return false;
             }
+        }
+
+        private function buildImageUrl($imagePath) {
+            if (empty($imagePath)) {
+                return null;
+            }
+            
+            // Se já é uma URL completa, retorna como está
+            if (strpos($imagePath, 'http') === 0) {
+                return $imagePath;
+            }
+            
+            // 🔥 CORREÇÃO: URL base fixa para produção
+            $baseUrl = 'https://api.clidefit.com.br';
+            
+            // Se o caminho começa com /, remove a barra inicial
+            $cleanPath = ltrim($imagePath, '/');
+            
+            return $baseUrl . '/' . $cleanPath;
         }
     }
