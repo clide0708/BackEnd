@@ -470,26 +470,46 @@
         ],
 
         // Rotas para ConvitesController
-        'convites/criar' => [
+        'convite' => [
             'controller' => 'ConvitesController',
-            'method' => 'criarConvite'
+            'method' => 'enviarConvite'
         ],
         'convites/email/([^/]+)' => [
             'controller' => 'ConvitesController', 
             'method' => 'getConvitesByEmail'
         ],
-        'convites/([^/]+)' => [
+        'meus-convites' => [
             'controller' => 'ConvitesController',
-            'method' => 'getConvites'
+            'method' => 'meusConvites'
         ],
-
         'convites/(\d+)/aceitar' => [
             'controller' => 'ConvitesController',
             'method' => 'aceitarConvite'
         ],
-        'convites/(\d+)/negar' => [
+        'convites/(\d+)/recusar' => [
             'controller' => 'ConvitesController',
-            'method' => 'negarConvite'
+            'method' => 'recusarConvite'
+        ],
+        'convites/verificar-pendente' => [
+            'controller' => 'ConvitesController',
+            'method' => 'verificarConvitePendente'
+        ],
+
+        'notificacoes' => [
+            'controller' => 'NotificacoesController',
+            'method' => 'listarNotificacoes'
+        ],
+        'notificacoes/(\d+)/marcar-lida' => [
+            'controller' => 'NotificacoesController',
+            'method' => 'marcarComoLida'
+        ],
+        'notificacoes/marcar-todas-lidas' => [
+            'controller' => 'NotificacoesController',
+            'method' => 'marcarTodasComoLidas'
+        ],
+        'notificacoes/contador' => [
+            'controller' => 'NotificacoesController',
+            'method' => 'contadorNotificacoes'
         ],
 
         // Rotas para Recuperação de Senha
@@ -723,6 +743,7 @@
         'UploadController' => __DIR__ . '/../Controllers/UploadController.php',
         'AcademiasController' => __DIR__ . '/../Controllers/AcademiasController.php',
         'EnderecoController' => __DIR__ . '/../Controllers/EnderecoController.php',
+        'NotificacoesController' => __DIR__ . '/../Controllers/NotificacoesController.php',
     ];
 
     // ATUALIZAR Rotas Públicas - Adicionar novas rotas públicas

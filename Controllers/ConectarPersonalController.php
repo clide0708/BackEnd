@@ -19,7 +19,6 @@
             header('Content-Type: application/json');
 
             try {
-                // Obter usuário autenticado
                 $usuario = $this->getUsuarioFromToken();
                 
                 if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
@@ -35,22 +34,14 @@
                 $filtros = $this->obterFiltrosDaRequisicao();
                 error_log("🎯 Filtros recebidos em listarPersonais: " . json_encode($filtros));
 
-                // ⭐⭐ OTIMIZAÇÃO: Obter localização apenas se necessário
-                $localizacaoUsuario = null;
-                $usarLocalizacao = !empty($filtros['raio_km']) && $filtros['raio_km'] > 0;
-                
-                if ($usarLocalizacao) {
-                    $localizacaoUsuario = $this->obterLocalizacaoUsuario($usuario, $filtros);
-                }
-
-                // ⭐⭐ OTIMIZAÇÃO: Query base simplificada inicialmente
+                // Query base CORRIGIDA
                 $sql = "
-                    SELECT 
+                    SELECT DISTINCT
                         p.idPersonal,
                         p.nome,
-                        p.foto_perfil,
+                        p.foto_url as foto_perfil,
                         p.genero,
-                        p.idade,
+                        TIMESTAMPDIFF(YEAR, p.data_nascimento, CURDATE()) as idade,
                         p.data_nascimento,
                         CONCAT(p.cref_numero, '-', p.cref_categoria, '/', p.cref_regional) as cref,
                         p.cref_categoria as cref_tipo,
@@ -59,16 +50,21 @@
                         e.cidade,
                         e.estado,
                         e.latitude,
-                        e.longitude
+                        e.longitude,
+                        ac.nome as nome_academia,
+                        ac.idAcademia,
+                        (SELECT COUNT(*) FROM treinos t WHERE t.idPersonal = p.idPersonal) as treinos_count
                     FROM personal p
                     LEFT JOIN enderecos_usuarios e ON p.idPersonal = e.idUsuario AND e.tipoUsuario = 'personal'
+                    LEFT JOIN academias ac ON p.idAcademia = ac.idAcademia
                     WHERE p.status_conta = 'Ativa'
+                    AND p.cadastro_completo = 1
                 ";
 
                 $params = [];
                 $conditions = [];
 
-                // Aplicar filtros básicos primeiro (mais seletivos)
+                // Aplicar filtros básicos
                 $this->aplicarFiltrosComuns($sql, $conditions, $params, $filtros, 'personal');
                 $this->aplicarFiltrosPersonal($sql, $conditions, $params, $filtros);
 
@@ -76,50 +72,20 @@
                     $sql .= " AND " . implode(" AND ", $conditions);
                 }
 
-                // ⭐⭐ OTIMIZAÇÃO: Ordenar por ID inicialmente para resposta rápida
-                $sql .= " ORDER BY p.idPersonal DESC LIMIT 100";
+                $sql .= " ORDER BY p.data_cadastro DESC";
 
-                error_log("🔍 SQL Personais (Otimizado): " . $sql);
+                error_log("🔍 SQL Personais Final: " . $sql);
                 error_log("📊 Parâmetros Personais: " . json_encode($params));
 
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute($params);
                 $personais = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                // ⭐⭐ OTIMIZAÇÃO: Processar modalidades em lote separado
-                if (!empty($personais)) {
-                    $idsPersonais = array_column($personais, 'idPersonal');
-                    $modalidadesPorPersonal = $this->obterModalidadesEmLote($idsPersonais, 'personal');
-                    
-                    // Buscar contagem de treinos em lote
-                    $treinosCountPorPersonal = $this->obterContagemTreinosEmLote($idsPersonais);
-                }
-
-                // Processar resultados com cálculo de distância
+                // Processar resultados
                 $resultados = [];
                 foreach ($personais as $personal) {
-                    // Calcular distância se necessário
-                    $distancia = null;
-                    $precisao_distancia = null;
-                    
-                    if ($usarLocalizacao && $localizacaoUsuario && 
-                        $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude'] &&
-                        $personal['latitude'] && $personal['longitude']) {
-                        
-                        $distancia = $this->calcularDistancia(
-                            $localizacaoUsuario['latitude'],
-                            $localizacaoUsuario['longitude'],
-                            $personal['latitude'],
-                            $personal['longitude']
-                        );
-
-                        $precisao_distancia = $localizacaoUsuario['precisao'] ?? 'media';
-
-                        // Aplicar filtro de raio
-                        if ($distancia > $filtros['raio_km']) {
-                            continue;
-                        }
-                    }
+                    // Buscar modalidades do personal
+                    $modalidades = $this->obterModalidadesPersonal($personal['idPersonal']);
 
                     // Verificar convite pendente
                     $convitePendente = $this->verificarConvitePendente(
@@ -128,9 +94,6 @@
                         $personal['idPersonal'], 
                         'personal'
                     );
-
-                    // Processar modalidades do lote
-                    $modalidades = $modalidadesPorPersonal[$personal['idPersonal']] ?? [];
 
                     $resultados[] = [
                         'idPersonal' => $personal['idPersonal'],
@@ -145,33 +108,19 @@
                         'cidade' => $personal['cidade'],
                         'estado' => $personal['estado'],
                         'modalidades' => $modalidades,
-                        'treinos_count' => $treinosCountPorPersonal[$personal['idPersonal']] ?? 0,
-                        'distancia_km' => $distancia,
-                        'precisao_distancia' => $precisao_distancia,
+                        'treinos_count' => $personal['treinos_count'],
+                        'nomeAcademia' => $personal['nome_academia'],
                         'convitePendente' => $convitePendente,
-                        'possui_localizacao' => !empty($personal['latitude']) && !empty($personal['longitude'])
+                        'latitude' => $personal['latitude'],
+                        'longitude' => $personal['longitude']
                     ];
-                }
-
-                // ⭐⭐ OTIMIZAÇÃO: Ordenar por distância se aplicável
-                if ($usarLocalizacao && $localizacaoUsuario) {
-                    usort($resultados, function($a, $b) {
-                        return ($a['distancia_km'] ?? 9999) <=> ($b['distancia_km'] ?? 9999);
-                    });
                 }
 
                 http_response_code(200);
                 echo json_encode([
                     'success' => true,
                     'data' => $resultados,
-                    'total' => count($resultados),
-                    'localizacao_usuario' => $localizacaoUsuario,
-                    'debug' => [
-                        'filtros_recebidos' => $filtros,
-                        'query_executada' => $sql,
-                        'parametros_query' => $params,
-                        'tempo_processamento' => microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"]
-                    ]
+                    'total' => count($resultados)
                 ]);
 
             } catch (PDOException $e) {
@@ -181,13 +130,25 @@
                     'success' => false,
                     'error' => 'Erro no banco: ' . $e->getMessage()
                 ]);
+            }
+        }
+
+        private function obterModalidadesAluno($idAluno)
+        {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT m.nome 
+                    FROM modalidades_aluno ma
+                    JOIN modalidades m ON ma.idModalidade = m.idModalidade
+                    WHERE ma.idAluno = ?
+                ");
+                $stmt->execute([$idAluno]);
+                $modalidades = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+                
+                return $modalidades;
             } catch (Exception $e) {
-                error_log("❌ Erro geral listarPersonais: " . $e->getMessage());
-                http_response_code(500);
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'Erro interno: ' . $e->getMessage()
-                ]);
+                error_log("Erro ao buscar modalidades do aluno: " . $e->getMessage());
+                return [];
             }
         }
 
@@ -201,30 +162,27 @@
             try {
                 $usuario = $this->getUsuarioFromToken();
                 
-                if (!$usuario || !isset($usuario['tipo']) || !in_array($usuario['tipo'], ['aluno', 'personal'])) {
+                if (!$usuario || $usuario['tipo'] !== 'personal') {
                     http_response_code(403);
                     echo json_encode([
                         'success' => false,
-                        'error' => 'Apenas alunos e personais podem acessar esta funcionalidade'
+                        'error' => 'Apenas personais podem acessar esta funcionalidade'
                     ]);
                     return;
                 }
 
-                // ⭐⭐ CORREÇÃO: Obter filtros da query string
+                // Obter filtros da query string
                 $filtros = $this->obterFiltrosDaRequisicao();
                 error_log("🎯 Filtros recebidos em listarAlunos: " . json_encode($filtros));
 
-                // Obter localização do usuário para cálculo de distância
-                $localizacaoUsuario = $this->obterLocalizacaoUsuario($usuario, $filtros);
-
-                // Construir query base
+                // Construir query base CORRIGIDA
                 $sql = "
                     SELECT DISTINCT
                         a.idAluno,
                         a.nome,
-                        a.foto_perfil,
+                        a.foto_url as foto_perfil,
                         a.genero,
-                        a.idade,
+                        TIMESTAMPDIFF(YEAR, a.data_nascimento, CURDATE()) as idade,
                         a.data_nascimento,
                         a.altura,
                         a.peso,
@@ -237,22 +195,20 @@
                         e.estado,
                         e.latitude,
                         e.longitude,
-                        GROUP_CONCAT(DISTINCT m.nome) as modalidades_nomes,
                         ac.nome as nome_academia,
                         ac.idAcademia
                     FROM alunos a
                     LEFT JOIN enderecos_usuarios e ON a.idAluno = e.idUsuario AND e.tipoUsuario = 'aluno'
-                    LEFT JOIN modalidades_aluno ma ON a.idAluno = ma.idAluno
-                    LEFT JOIN modalidades m ON ma.idModalidade = m.idModalidade
                     LEFT JOIN academias ac ON a.idAcademia = ac.idAcademia
                     WHERE a.status_conta = 'Ativa' 
+                    AND a.cadastro_completo = 1
                     AND a.idPersonal IS NULL
                 ";
 
                 $params = [];
                 $conditions = [];
 
-                // ⭐⭐ CORREÇÃO: Aplicar filtros corretamente
+                // Aplicar filtros
                 $this->aplicarFiltrosComuns($sql, $conditions, $params, $filtros, 'aluno');
                 $this->aplicarFiltrosAluno($sql, $conditions, $params, $filtros);
 
@@ -260,57 +216,28 @@
                     $sql .= " AND " . implode(" AND ", $conditions);
                 }
 
-                $sql .= " GROUP BY a.idAluno, e.idEndereco ";
-                
-                // Ordenar por distância se houver localização de referência
-                if ($localizacaoUsuario && $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude']) {
-                    $sql .= " ORDER BY calcular_distancia_aproximada(?, ?, e.latitude, e.longitude) ASC";
-                    array_unshift($params, $localizacaoUsuario['latitude'], $localizacaoUsuario['longitude']);
-                } else {
-                    $sql .= " ORDER BY a.data_cadastro DESC";
-                }
+                $sql .= " ORDER BY a.data_cadastro DESC";
 
-                error_log("🔍 SQL Alunos: " . $sql);
+                error_log("🔍 SQL Alunos Final: " . $sql);
                 error_log("📊 Parâmetros Alunos: " . json_encode($params));
 
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute($params);
                 $alunos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                // Processar resultados com cálculo de distância
+                // Processar resultados
                 $resultados = [];
                 foreach ($alunos as $aluno) {
-                    // Calcular distância se tivermos coordenadas
-                    $distancia = null;
-                    if ($localizacaoUsuario && $localizacaoUsuario['latitude'] && $localizacaoUsuario['longitude'] &&
-                        $aluno['latitude'] && $aluno['longitude']) {
-                        
-                        $distancia = $this->calcularDistancia(
-                            $localizacaoUsuario['latitude'],
-                            $localizacaoUsuario['longitude'],
-                            $aluno['latitude'],
-                            $aluno['longitude']
-                        );
+                    // Buscar modalidades do aluno
+                    $modalidades = $this->obterModalidadesAluno($aluno['idAluno']);
 
-                        // Aplicar filtro de raio se especificado
-                        if (!empty($filtros['raio_km']) && $filtros['raio_km'] > 0 && $distancia > $filtros['raio_km']) {
-                            continue; // Pular alunos fora do raio
-                        }
-                    }
-
-                    // Verificar convite pendente
+                    // 🔥 CORREÇÃO: Usar o método correto
                     $convitePendente = $this->verificarConvitePendente(
                         $usuario['id'], 
                         'personal', 
                         $aluno['idAluno'], 
                         'aluno'
                     );
-
-                    // Processar modalidades
-                    $modalidades = [];
-                    if (!empty($aluno['modalidades_nomes'])) {
-                        $modalidades = explode(',', $aluno['modalidades_nomes']);
-                    }
 
                     $resultados[] = [
                         'idAluno' => $aluno['idAluno'],
@@ -327,9 +254,9 @@
                         'estado' => $aluno['estado'],
                         'modalidades' => $modalidades,
                         'nomeAcademia' => $aluno['nome_academia'],
-                        'distancia_km' => $distancia,
                         'convitePendente' => $convitePendente,
-                        'possui_localizacao' => !empty($aluno['latitude']) && !empty($aluno['longitude'])
+                        'latitude' => $aluno['latitude'],
+                        'longitude' => $aluno['longitude']
                     ];
                 }
 
@@ -337,13 +264,7 @@
                 echo json_encode([
                     'success' => true,
                     'data' => $resultados,
-                    'total' => count($resultados),
-                    'localizacao_usuario' => $localizacaoUsuario,
-                    'debug' => [
-                        'filtros_recebidos' => $filtros,
-                        'query_executada' => $sql,
-                        'parametros_query' => $params
-                    ]
+                    'total' => count($resultados)
                 ]);
 
             } catch (PDOException $e) {
@@ -352,13 +273,6 @@
                 echo json_encode([
                     'success' => false,
                     'error' => 'Erro no banco: ' . $e->getMessage()
-                ]);
-            } catch (Exception $e) {
-                error_log("❌ Erro geral listarAlunos: " . $e->getMessage());
-                http_response_code(500);
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'Erro interno: ' . $e->getMessage()
                 ]);
             }
         }
@@ -650,21 +564,27 @@
          */
         private function verificarConvitePendente($idRemetente, $tipoRemetente, $idDestinatario, $tipoDestinatario)
         {
-            $stmt = $this->db->prepare("
-                SELECT idConvite FROM convites 
-                WHERE (
-                    (idPersonal = ? AND idAluno = ?) OR 
-                    (idPersonal = ? AND idAluno = ?)
-                ) AND status = 'pendente'
-            ");
-            
-            if ($tipoRemetente === 'personal') {
-                $stmt->execute([$idRemetente, $idDestinatario, $idDestinatario, $idRemetente]);
-            } else {
-                $stmt->execute([$idDestinatario, $idRemetente, $idRemetente, $idDestinatario]);
-            }
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT idConvite FROM convites 
+                    WHERE (
+                        (idPersonal = ? AND idAluno = ?) OR 
+                        (idPersonal = ? AND idAluno = ?)
+                    ) AND status = 'pendente'
+                    LIMIT 1
+                ");
+                
+                if ($tipoRemetente === 'personal') {
+                    $stmt->execute([$idRemetente, $idDestinatario, $idDestinatario, $idRemetente]);
+                } else {
+                    $stmt->execute([$idDestinatario, $idRemetente, $idRemetente, $idDestinatario]);
+                }
 
-            return $stmt->fetch() !== false;
+                return $stmt->fetch() !== false;
+            } catch (PDOException $e) {
+                error_log("Erro ao verificar convite pendente: " . $e->getMessage());
+                return false;
+            }
         }
 
         /**
@@ -1006,6 +926,81 @@
             if (!empty($filtros['meta'])) {
                 $conditions[] = "a.meta LIKE ?";
                 $params[] = '%' . $filtros['meta'] . '%';
+            }
+        }
+
+        public function estatisticasConvites() {
+            header('Content-Type: application/json');
+
+            try {
+                $usuario = $this->getUsuarioFromToken();
+                if (!$usuario) {
+                    http_response_code(401);
+                    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+                    return;
+                }
+
+                $idUsuario = $usuario['id'];
+                $tipoUsuario = $usuario['tipo'];
+
+                if ($tipoUsuario === 'personal') {
+                    // Estatísticas para personal
+                    $sql = "
+                        SELECT 
+                            COUNT(*) as total,
+                            SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes,
+                            SUM(CASE WHEN status = 'aceito' THEN 1 ELSE 0 END) as aceitos,
+                            SUM(CASE WHEN status = 'recusado' THEN 1 ELSE 0 END) as recusados
+                        FROM convites 
+                        WHERE idPersonal = ?
+                    ";
+                } else {
+                    // Estatísticas para aluno
+                    $sql = "
+                        SELECT 
+                            COUNT(*) as total,
+                            SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes,
+                            SUM(CASE WHEN status = 'aceito' THEN 1 ELSE 0 END) as aceitos,
+                            SUM(CASE WHEN status = 'recusado' THEN 1 ELSE 0 END) as recusados
+                        FROM convites 
+                        WHERE idAluno = ?
+                    ";
+                }
+
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute([$idUsuario]);
+                $estatisticas = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                echo json_encode([
+                    'success' => true,
+                    'data' => $estatisticas
+                ]);
+
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Erro no banco: ' . $e->getMessage()
+                ]);
+            }
+        }
+
+        private function obterModalidadesPersonal($idPersonal)
+        {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT m.nome 
+                    FROM modalidades_personal mp
+                    JOIN modalidades m ON mp.idModalidade = m.idModalidade
+                    WHERE mp.idPersonal = ?
+                ");
+                $stmt->execute([$idPersonal]);
+                $modalidades = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+                
+                return $modalidades;
+            } catch (Exception $e) {
+                error_log("Erro ao buscar modalidades do personal: " . $e->getMessage());
+                return [];
             }
         }
     }
