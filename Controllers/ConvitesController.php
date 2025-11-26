@@ -134,6 +134,9 @@
                     $stmt->execute([$idConvite]);
                     $convite = $stmt->fetch(PDO::FETCH_ASSOC);
 
+                    // 🔥 NOVO: Criar notificação para o destinatário
+                    $this->criarNotificacaoConviteEnviado($convite);
+
                     http_response_code(201);
                     echo json_encode([
                         'success' => true,
@@ -571,6 +574,53 @@
             }
             
             return null;
+        }
+
+        private function criarNotificacaoConviteEnviado($convite)
+        {
+            try {
+                $mensagem = "";
+                $idDestinatario = null;
+                $tipoDestinatario = "";
+
+                if ($convite['tipo_remetente'] === 'personal') {
+                    // Personal enviou para aluno - notificar aluno
+                    $stmt = $this->db->prepare("SELECT nome FROM personal WHERE idPersonal = ?");
+                    $stmt->execute([$convite['idPersonal']]);
+                    $personal = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    $mensagem = "Personal {$personal['nome']} enviou um convite para você!";
+                    $idDestinatario = $convite['idAluno'];
+                    $tipoDestinatario = 'aluno';
+                } else {
+                    // Aluno enviou para personal - notificar personal
+                    $stmt = $this->db->prepare("SELECT nome FROM alunos WHERE idAluno = ?");
+                    $stmt->execute([$convite['idAluno']]);
+                    $aluno = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    $mensagem = "Aluno {$aluno['nome']} enviou um convite para você!";
+                    $idDestinatario = $convite['idPersonal'];
+                    $tipoDestinatario = 'personal';
+                }
+
+                if ($idDestinatario && $tipoDestinatario) {
+                    $stmt = $this->db->prepare("
+                        INSERT INTO notificacoes 
+                        (idUsuario, tipoUsuario, titulo, mensagem, tipo, lida, data_criacao)
+                        VALUES (?, ?, 'Novo Convite', ?, 'novo_convite', 0, NOW())
+                    ");
+                    $stmt->execute([$idDestinatario, $tipoDestinatario, $mensagem]);
+                    
+                    error_log("✅ Notificação criada para: " . json_encode([
+                        'idUsuario' => $idDestinatario,
+                        'tipoUsuario' => $tipoDestinatario,
+                        'mensagem' => $mensagem
+                    ]));
+                }
+
+            } catch (Exception $e) {
+                error_log("❌ Erro ao criar notificação de convite enviado: " . $e->getMessage());
+            }
         }
     }
 
