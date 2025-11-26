@@ -9,6 +9,17 @@
             $this->db = DB::connectDB();
         }
 
+        private function getBaseUrl() {
+            $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'];
+            
+            // Remove /api se estiver na URL
+            $basePath = str_replace('/api', '', $_SERVER['REQUEST_URI'] ?? '');
+            $basePath = dirname($basePath);
+            
+            return "{$protocol}://{$host}{$basePath}";
+        }
+
         public function uploadFotoPerfil($data = null) {
             try {
                 // Verificar se é um upload de arquivo via POST
@@ -55,21 +66,18 @@
 
                 // Mover arquivo para o diretório de destino
                 if (move_uploaded_file($arquivo['tmp_name'], $caminhoCompleto)) {
-                    // URL relativa para acesso via frontend
+                    // URL relativa para compatibilidade
                     $urlRelativa = '/assets/images/uploads/' . $nomeArquivo;
                     
-                    // 🔥 VERIFICAR SE O ARQUIVO REALMENTE FOI CRIADO
-                    if (file_exists($caminhoCompleto)) {
-                        error_log("✅ Arquivo salvo com sucesso: " . $caminhoCompleto);
-                        error_log("✅ Tamanho do arquivo: " . filesize($caminhoCompleto) . " bytes");
-                    } else {
-                        error_log("❌ ERRO: Arquivo não foi criado: " . $caminhoCompleto);
-                    }
+                    // URL completa dinâmica
+                    $baseUrl = $this->getBaseUrl(); // Implemente esta função
+                    $urlCompleta = $baseUrl . 'assets/images/uploads/' . $nomeArquivo;
                     
                     http_response_code(200);
                     echo json_encode([
                         'success' => true,
-                        'url' => $urlRelativa,
+                        'url' => $urlRelativa, // Para compatibilidade
+                        'url_completa' => $urlCompleta, // Nova URL completa
                         'nome_arquivo' => $nomeArquivo,
                         'message' => 'Foto uploadada com sucesso'
                     ]);
